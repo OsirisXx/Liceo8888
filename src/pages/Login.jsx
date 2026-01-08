@@ -1,34 +1,57 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../contexts/AuthContext'
-import { Mail, Lock, LogIn, AlertCircle } from 'lucide-react'
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabase";
+import { Mail, Lock, LogIn, AlertCircle } from "lucide-react";
 
 const Login = () => {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-  const { signIn } = useAuth()
-  const navigate = useNavigate()
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { signIn, user, userRole } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user && userRole) {
+      if (userRole === "admin") {
+        navigate("/admin");
+      } else if (userRole === "department") {
+        navigate("/department");
+      }
+    }
+  }, [user, userRole, navigate]);
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
-    const { data, error: signInError } = await signIn(email, password)
+    const { data, error: signInError } = await signIn(email, password);
 
     if (signInError) {
-      setError(signInError.message)
-      setLoading(false)
-      return
+      setError(signInError.message);
+      setLoading(false);
+      return;
     }
 
     if (data?.user) {
-      navigate('/admin')
+      const { data: userData } = await supabase
+        .from("users")
+        .select("role")
+        .eq("id", data.user.id)
+        .single();
+
+      if (userData?.role === "admin") {
+        navigate("/admin");
+      } else if (userData?.role === "department") {
+        navigate("/department");
+      } else {
+        navigate("/");
+      }
     }
-    setLoading(false)
-  }
+    setLoading(false);
+  };
 
   return (
     <div className="min-h-[calc(100vh-200px)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gray-50">
@@ -40,13 +63,18 @@ const Login = () => {
               <Lock size={32} className="text-gold-400" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900">Staff Login</h2>
-            <p className="text-gray-600 mt-2">Sign in to access your dashboard</p>
+            <p className="text-gray-600 mt-2">
+              Sign in to access your dashboard
+            </p>
           </div>
 
           {/* Error Message */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start space-x-3">
-              <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
+              <AlertCircle
+                size={20}
+                className="text-red-500 flex-shrink-0 mt-0.5"
+              />
               <p className="text-red-700 text-sm">{error}</p>
             </div>
           )}
@@ -54,7 +82,10 @@ const Login = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Email Address
               </label>
               <div className="relative">
@@ -74,7 +105,10 @@ const Login = () => {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Password
               </label>
               <div className="relative">
@@ -118,7 +152,7 @@ const Login = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Login
+export default Login;

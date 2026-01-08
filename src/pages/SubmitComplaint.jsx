@@ -1,144 +1,167 @@
-import { useState } from 'react'
-import { supabase } from '../lib/supabase'
-import { 
-  FileText, 
-  User, 
-  Mail, 
-  Tag, 
-  MessageSquare, 
-  Paperclip, 
-  Send, 
+import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase";
+import {
+  FileText,
+  User,
+  Mail,
+  Tag,
+  MessageSquare,
+  Paperclip,
+  Send,
   CheckCircle,
   AlertCircle,
   Copy,
-  EyeOff
-} from 'lucide-react'
+  EyeOff,
+} from "lucide-react";
 
 const SubmitComplaint = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const initialComplaint = location.state?.complaint || "";
+
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    studentId: '',
-    category: '',
-    description: '',
+    name: "",
+    email: "",
+    studentId: "",
+    category: "",
+    description: initialComplaint,
     isAnonymous: false,
-  })
-  const [attachment, setAttachment] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
-  const [referenceNumber, setReferenceNumber] = useState('')
-  const [copied, setCopied] = useState(false)
+  });
+  const [attachment, setAttachment] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [referenceNumber, setReferenceNumber] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const categories = [
-    { value: 'academic', label: 'Academic', description: 'Grades, curriculum, professors, classes' },
-    { value: 'facilities', label: 'Facilities', description: 'Buildings, equipment, maintenance' },
-    { value: 'finance', label: 'Finance', description: 'Tuition, fees, payments, scholarships' },
-    { value: 'staff', label: 'Staff', description: 'Administrative staff, services' },
-    { value: 'security', label: 'Security', description: 'Safety concerns, incidents' },
-    { value: 'other', label: 'Other', description: 'General concerns' },
-  ]
+    {
+      value: "academic",
+      label: "Academic",
+      description: "Grades, curriculum, professors, classes",
+    },
+    {
+      value: "facilities",
+      label: "Facilities",
+      description: "Buildings, equipment, maintenance",
+    },
+    {
+      value: "finance",
+      label: "Finance",
+      description: "Tuition, fees, payments, scholarships",
+    },
+    {
+      value: "staff",
+      label: "Staff",
+      description: "Administrative staff, services",
+    },
+    {
+      value: "security",
+      label: "Security",
+      description: "Safety concerns, incidents",
+    },
+    { value: "other", label: "Other", description: "General concerns" },
+  ];
 
   const generateReferenceNumber = () => {
-    const timestamp = Date.now().toString(36).toUpperCase()
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase()
-    return `LDCU-${timestamp}-${random}`
-  }
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `LDCU-${timestamp}-${random}`;
+  };
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target
-    setFormData(prev => ({
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }))
-  }
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0]
-    if (!file) return
-    
+    const file = e.target.files[0];
+    if (!file) return;
+
     // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setError('File size must be less than 5MB')
-      e.target.value = ''
-      return
+      setError("File size must be less than 5MB");
+      e.target.value = "";
+      return;
     }
-    
+
     // Check if it's an image
-    if (!file.type.startsWith('image/')) {
-      setError('Please upload an image file (JPG, PNG, GIF, etc.)')
-      e.target.value = ''
-      return
+    if (!file.type.startsWith("image/")) {
+      setError("Please upload an image file (JPG, PNG, GIF, etc.)");
+      e.target.value = "";
+      return;
     }
-    
-    setError('')
-    setAttachment(file)
-  }
+
+    setError("");
+    setAttachment(file);
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
     // Validate attachment is provided
     if (!attachment) {
-      setError('Please upload an image as evidence for your complaint')
-      setLoading(false)
-      return
+      setError("Please upload an image as evidence for your complaint");
+      setLoading(false);
+      return;
     }
 
     try {
-      const refNumber = generateReferenceNumber()
-      let attachmentUrl = null
+      const refNumber = generateReferenceNumber();
+      let attachmentUrl = null;
 
       if (attachment) {
-        const fileExt = attachment.name.split('.').pop()
-        const fileName = `${refNumber}.${fileExt}`
+        const fileExt = attachment.name.split(".").pop();
+        const fileName = `${refNumber}.${fileExt}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('attachments')
-          .upload(fileName, attachment)
+          .from("attachments")
+          .upload(fileName, attachment);
 
         if (uploadError) {
-          console.error('Upload error:', uploadError)
+          console.error("Upload error:", uploadError);
         } else {
-          const { data: { publicUrl } } = supabase.storage
-            .from('attachments')
-            .getPublicUrl(fileName)
-          attachmentUrl = publicUrl
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from("attachments").getPublicUrl(fileName);
+          attachmentUrl = publicUrl;
         }
       }
 
-      const { error: insertError } = await supabase
-        .from('complaints')
-        .insert({
-          reference_number: refNumber,
-          name: formData.isAnonymous ? 'Anonymous' : formData.name,
-          email: formData.email,
-          student_id: formData.studentId,
-          category: formData.category,
-          description: formData.description,
-          is_anonymous: formData.isAnonymous,
-          attachment_url: attachmentUrl,
-          status: 'submitted',
-        })
+      const { error: insertError } = await supabase.from("complaints").insert({
+        reference_number: refNumber,
+        name: formData.isAnonymous ? "Anonymous" : formData.name,
+        email: formData.email,
+        student_id: formData.studentId,
+        category: formData.category,
+        description: formData.description,
+        is_anonymous: formData.isAnonymous,
+        attachment_url: attachmentUrl,
+        status: "submitted",
+      });
 
-      if (insertError) throw insertError
+      if (insertError) throw insertError;
 
-      setReferenceNumber(refNumber)
-      setSuccess(true)
+      setReferenceNumber(refNumber);
+      setSuccess(true);
     } catch (err) {
-      console.error('Submit error:', err)
-      setError(err.message || 'Failed to submit complaint. Please try again.')
+      console.error("Submit error:", err);
+      setError(err.message || "Failed to submit complaint. Please try again.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(referenceNumber)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+    navigator.clipboard.writeText(referenceNumber);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   if (success) {
     return (
@@ -148,55 +171,56 @@ const SubmitComplaint = () => {
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle size={40} className="text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Complaint Submitted!</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              Complaint Submitted!
+            </h2>
             <p className="text-gray-600 mb-6">
-              Your complaint has been successfully submitted. Please save your reference number to track the status.
+              Your complaint has been successfully submitted. Please save your
+              reference number to track the status.
             </p>
-            
+
             <div className="bg-maroon-50 border border-maroon-200 rounded-xl p-4 mb-6">
               <p className="text-sm text-maroon-600 mb-2">Reference Number</p>
               <div className="flex items-center justify-center space-x-2">
-                <span className="text-2xl font-bold text-maroon-800 font-mono">{referenceNumber}</span>
+                <span className="text-2xl font-bold text-maroon-800 font-mono">
+                  {referenceNumber}
+                </span>
                 <button
                   onClick={copyToClipboard}
                   className="p-2 hover:bg-maroon-100 rounded-lg transition-colors"
                   title="Copy to clipboard"
                 >
-                  <Copy size={20} className={copied ? 'text-green-600' : 'text-maroon-600'} />
+                  <Copy
+                    size={20}
+                    className={copied ? "text-green-600" : "text-maroon-600"}
+                  />
                 </button>
               </div>
-              {copied && <p className="text-sm text-green-600 mt-2">Copied to clipboard!</p>}
+              {copied && (
+                <p className="text-sm text-green-600 mt-2">
+                  Copied to clipboard!
+                </p>
+              )}
             </div>
 
             <div className="space-y-3">
-              <a
-                href="/track"
+              <button
+                onClick={() => navigate("/track")}
                 className="block w-full bg-maroon-800 text-white py-3 px-4 rounded-xl font-semibold hover:bg-maroon-700 transition-all duration-200"
               >
                 Track Your Complaint
-              </a>
+              </button>
               <button
-                onClick={() => {
-                  setSuccess(false)
-                  setFormData({
-                    name: '',
-                    email: '',
-                    studentId: '',
-                    category: '',
-                    description: '',
-                    isAnonymous: false,
-                  })
-                  setAttachment(null)
-                }}
+                onClick={() => navigate("/")}
                 className="block w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-semibold hover:bg-gray-200 transition-all duration-200"
               >
-                Submit Another Complaint
+                Back to Home
               </button>
             </div>
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -207,15 +231,22 @@ const SubmitComplaint = () => {
           <div className="w-16 h-16 bg-maroon-800 rounded-full flex items-center justify-center mx-auto mb-4">
             <FileText size={32} className="text-gold-400" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Submit a Complaint</h1>
-          <p className="text-gray-600 mt-2">Fill out the form below to submit your concern</p>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Submit a Complaint
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Fill out the form below to submit your concern
+          </p>
         </div>
 
         {/* Form */}
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start space-x-3">
-              <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
+              <AlertCircle
+                size={20}
+                className="text-red-500 flex-shrink-0 mt-0.5"
+              />
               <p className="text-red-700 text-sm">{error}</p>
             </div>
           )}
@@ -233,7 +264,9 @@ const SubmitComplaint = () => {
                 />
                 <div className="ml-3 flex items-center space-x-2">
                   <EyeOff size={18} className="text-gray-500" />
-                  <span className="font-medium text-gray-700">Submit Anonymously</span>
+                  <span className="font-medium text-gray-700">
+                    Submit Anonymously
+                  </span>
                 </div>
               </label>
               <p className="text-sm text-gray-500 mt-2 ml-8">
@@ -244,7 +277,10 @@ const SubmitComplaint = () => {
             {/* Name */}
             {!formData.isAnonymous && (
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="name"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
                   Full Name
                 </label>
                 <div className="relative">
@@ -267,8 +303,12 @@ const SubmitComplaint = () => {
 
             {/* Email */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address <span className="text-gray-400">(for updates)</span>
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Email Address{" "}
+                <span className="text-gray-400">(for updates)</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -288,8 +328,12 @@ const SubmitComplaint = () => {
 
             {/* Student ID */}
             <div>
-              <label htmlFor="studentId" className="block text-sm font-medium text-gray-700 mb-2">
-                Student/Employee ID <span className="text-gray-400">(optional)</span>
+              <label
+                htmlFor="studentId"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                Student/Employee ID{" "}
+                <span className="text-gray-400">(optional)</span>
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -318,8 +362,8 @@ const SubmitComplaint = () => {
                     key={cat.value}
                     className={`relative flex flex-col p-4 border rounded-xl cursor-pointer transition-all duration-200 ${
                       formData.category === cat.value
-                        ? 'border-maroon-500 bg-maroon-50 ring-2 ring-maroon-500'
-                        : 'border-gray-200 hover:border-maroon-300 hover:bg-gray-50'
+                        ? "border-maroon-500 bg-maroon-50 ring-2 ring-maroon-500"
+                        : "border-gray-200 hover:border-maroon-300 hover:bg-gray-50"
                     }`}
                   >
                     <input
@@ -331,10 +375,18 @@ const SubmitComplaint = () => {
                       required
                       className="sr-only"
                     />
-                    <span className={`font-medium ${formData.category === cat.value ? 'text-maroon-800' : 'text-gray-700'}`}>
+                    <span
+                      className={`font-medium ${
+                        formData.category === cat.value
+                          ? "text-maroon-800"
+                          : "text-gray-700"
+                      }`}
+                    >
                       {cat.label}
                     </span>
-                    <span className="text-xs text-gray-500 mt-1">{cat.description}</span>
+                    <span className="text-xs text-gray-500 mt-1">
+                      {cat.description}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -342,7 +394,10 @@ const SubmitComplaint = () => {
 
             {/* Description */}
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="description"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Description <span className="text-red-500">*</span>
               </label>
               <div className="relative">
@@ -382,22 +437,29 @@ const SubmitComplaint = () => {
                 <label
                   htmlFor="attachment"
                   className={`flex items-center justify-center space-x-2 w-full py-4 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 ${
-                    attachment 
-                      ? 'border-green-400 bg-green-50' 
-                      : 'border-gray-300 hover:border-maroon-400 hover:bg-gray-50'
+                    attachment
+                      ? "border-green-400 bg-green-50"
+                      : "border-gray-300 hover:border-maroon-400 hover:bg-gray-50"
                   }`}
                 >
-                  <Paperclip size={20} className={attachment ? 'text-green-500' : 'text-gray-400'} />
-                  <span className={attachment ? 'text-green-700' : 'text-gray-600'}>
-                    {attachment ? attachment.name : 'Click to upload an image (required, max 5MB)'}
+                  <Paperclip
+                    size={20}
+                    className={attachment ? "text-green-500" : "text-gray-400"}
+                  />
+                  <span
+                    className={attachment ? "text-green-700" : "text-gray-600"}
+                  >
+                    {attachment
+                      ? attachment.name
+                      : "Click to upload an image (required, max 5MB)"}
                   </span>
                 </label>
               </div>
               {attachment && (
                 <div className="mt-3">
-                  <img 
-                    src={URL.createObjectURL(attachment)} 
-                    alt="Preview" 
+                  <img
+                    src={URL.createObjectURL(attachment)}
+                    alt="Preview"
                     className="max-h-40 rounded-lg border border-gray-200"
                   />
                   <button
@@ -433,7 +495,7 @@ const SubmitComplaint = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default SubmitComplaint
+export default SubmitComplaint;
