@@ -112,6 +112,51 @@ const Home = () => {
     resetForm();
   };
 
+  const getClientIP = async () => {
+    try {
+      const response = await fetch("https://api.ipify.org?format=json");
+      const data = await response.json();
+      return data.ip;
+    } catch {
+      return null;
+    }
+  };
+
+  const checkIPRateLimit = async (ipAddress) => {
+    if (!ipAddress) return { allowed: true };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { data, error } = await supabase
+      .from("complaint_submissions")
+      .select("id")
+      .eq("ip_address", ipAddress)
+      .gte("created_at", today.toISOString())
+      .limit(1);
+
+    if (error) {
+      console.error("Rate limit check error:", error);
+      return { allowed: true };
+    }
+
+    return { allowed: data.length === 0 };
+  };
+
+  const recordSubmission = async (ipAddress, complaintId) => {
+    if (!ipAddress) return;
+
+    try {
+      await supabase.from("complaint_submissions").insert({
+        ip_address: ipAddress,
+        complaint_id: complaintId,
+        user_agent: navigator.userAgent,
+      });
+    } catch (err) {
+      console.error("Error recording submission:", err);
+    }
+  };
+
   const handleSubmitComplaint = async (e) => {
     e.preventDefault();
     setError("");
@@ -127,6 +172,17 @@ const Home = () => {
     setLoading(true);
 
     try {
+      const ipAddress = await getClientIP();
+      const { allowed } = await checkIPRateLimit(ipAddress);
+
+      if (!allowed) {
+        setError(
+          "You have already submitted a complaint today. Please try again tomorrow."
+        );
+        setLoading(false);
+        return;
+      }
+
       const refNumber = generateReferenceNumber();
       const uploadedUrls = [];
 
@@ -146,21 +202,27 @@ const Home = () => {
         }
       }
 
-      const { error: insertError } = await supabase.from("complaints").insert({
-        reference_number: refNumber,
-        name: personalDetails.isAnonymous
-          ? "Anonymous"
-          : personalDetails.name || "Anonymous",
-        email: personalDetails.email || null,
-        student_id: personalDetails.studentId || null,
-        category: category,
-        description: complaint,
-        is_anonymous: personalDetails.isAnonymous || !personalDetails.name,
-        attachment_url: uploadedUrls[0] || null,
-        status: "submitted",
-      });
+      const { data: complaintData, error: insertError } = await supabase
+        .from("complaints")
+        .insert({
+          reference_number: refNumber,
+          name: personalDetails.isAnonymous
+            ? "Anonymous"
+            : personalDetails.name || "Anonymous",
+          email: personalDetails.email || null,
+          student_id: personalDetails.studentId || null,
+          category: category,
+          description: complaint,
+          is_anonymous: personalDetails.isAnonymous || !personalDetails.name,
+          attachment_url: uploadedUrls[0] || null,
+          status: "submitted",
+        })
+        .select("id")
+        .single();
 
       if (insertError) throw insertError;
+
+      await recordSubmission(ipAddress, complaintData?.id);
 
       setReferenceNumber(refNumber);
       setShowPopup(true);
@@ -533,7 +595,7 @@ const Home = () => {
                   onClick={closePopup}
                   className="inline-flex items-center justify-center space-x-2 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-200 transition-all"
                 >
-                  <span>Submit Another Complaint</span>
+                  <span>Close</span>
                 </button>
               </div>
             </div>
