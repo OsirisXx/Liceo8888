@@ -1,13 +1,14 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { AuthProvider } from './contexts/AuthContext'
-import Layout from './components/Layout'
-import ProtectedRoute from './components/ProtectedRoute'
-import Home from './pages/Home'
-import Login from './pages/Login'
-import SubmitComplaint from './pages/SubmitComplaint'
-import TrackComplaint from './pages/TrackComplaint'
-import AdminDashboard from './pages/AdminDashboard'
-import DepartmentDashboard from './pages/DepartmentDashboard'
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import Layout from "./components/Layout";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import SubmitComplaint from "./pages/SubmitComplaint";
+import TrackComplaint from "./pages/TrackComplaint";
+import AdminDashboard from "./pages/AdminDashboard";
+import DepartmentDashboard from "./pages/DepartmentDashboard";
+import SuperAdminDashboard from "./pages/SuperAdminDashboard";
 
 function App() {
   return (
@@ -22,7 +23,7 @@ function App() {
             <Route
               path="/admin"
               element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedRoles={["admin"]}>
                   <AdminDashboard />
                 </ProtectedRoute>
               }
@@ -30,8 +31,16 @@ function App() {
             <Route
               path="/department"
               element={
-                <ProtectedRoute allowedRoles={['department']}>
+                <ProtectedRoute allowedRoles={["department"]}>
                   <DepartmentDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/super-admin"
+              element={
+                <ProtectedRoute allowedRoles={["super_admin"]}>
+                  <SuperAdminDashboard />
                 </ProtectedRoute>
               }
             />
@@ -39,7 +48,7 @@ function App() {
         </Layout>
       </Router>
     </AuthProvider>
-  )
+  );
 }
 
-export default App
+export default App;

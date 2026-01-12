@@ -14,10 +14,12 @@ const Login = () => {
 
   useEffect(() => {
     if (user && userRole) {
-      if (userRole === "admin") {
-        navigate("/admin");
+      if (userRole === "super_admin") {
+        navigate("/super-admin", { replace: true });
+      } else if (userRole === "admin") {
+        navigate("/admin", { replace: true });
       } else if (userRole === "department") {
-        navigate("/department");
+        navigate("/department", { replace: true });
       }
     }
   }, [user, userRole, navigate]);
@@ -42,7 +44,9 @@ const Login = () => {
         .eq("id", data.user.id)
         .single();
 
-      if (userData?.role === "admin") {
+      if (userData?.role === "super_admin") {
+        navigate("/super-admin");
+      } else if (userData?.role === "admin") {
         navigate("/admin");
       } else if (userData?.role === "department") {
         navigate("/department");
