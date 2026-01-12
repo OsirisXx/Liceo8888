@@ -1,10 +1,10 @@
-import { useState } from 'react'
-import { supabase } from '../lib/supabase'
-import { 
-  Search, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
+import { useState } from "react";
+import { supabase } from "../lib/supabase";
+import {
+  Search,
+  Clock,
+  CheckCircle,
+  XCircle,
   AlertCircle,
   FileText,
   User,
@@ -12,113 +12,181 @@ import {
   Calendar,
   Building2,
   MessageSquare,
-  Loader2
-} from 'lucide-react'
+  Loader2,
+  Send,
+  Info,
+} from "lucide-react";
 
 const TrackComplaint = () => {
-  const [referenceNumber, setReferenceNumber] = useState('')
-  const [complaint, setComplaint] = useState(null)
-  const [auditTrail, setAuditTrail] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [searched, setSearched] = useState(false)
+  const [referenceNumber, setReferenceNumber] = useState("");
+  const [complaint, setComplaint] = useState(null);
+  const [auditTrail, setAuditTrail] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [searched, setSearched] = useState(false);
+  const [additionalInfo, setAdditionalInfo] = useState("");
+  const [sendingInfo, setSendingInfo] = useState(false);
+  const [infoSuccess, setInfoSuccess] = useState(false);
 
   const statusConfig = {
-    submitted: { 
-      label: 'Submitted', 
-      color: 'bg-blue-100 text-blue-800 border-blue-200',
+    submitted: {
+      label: "Submitted",
+      color: "bg-blue-100 text-blue-800 border-blue-200",
       icon: FileText,
-      description: 'Your complaint has been received and is awaiting verification.'
+      description:
+        "Your complaint has been received and is awaiting verification.",
     },
-    verified: { 
-      label: 'Verified', 
-      color: 'bg-gold-100 text-gold-800 border-gold-200',
+    verified: {
+      label: "Verified",
+      color: "bg-gold-100 text-gold-800 border-gold-200",
       icon: CheckCircle,
-      description: 'Your complaint has been verified and assigned to a department.'
+      description:
+        "Your complaint has been verified and assigned to a department.",
     },
-    rejected: { 
-      label: 'Rejected', 
-      color: 'bg-red-100 text-red-800 border-red-200',
+    rejected: {
+      label: "Rejected",
+      color: "bg-red-100 text-red-800 border-red-200",
       icon: XCircle,
-      description: 'Your complaint was not approved. See remarks for details.'
+      description: "Your complaint was not approved. See remarks for details.",
     },
-    in_progress: { 
-      label: 'In Progress', 
-      color: 'bg-orange-100 text-orange-800 border-orange-200',
+    in_progress: {
+      label: "In Progress",
+      color: "bg-orange-100 text-orange-800 border-orange-200",
       icon: Clock,
-      description: 'The department is actively working on resolving your complaint.'
+      description:
+        "The department is actively working on resolving your complaint.",
     },
-    resolved: { 
-      label: 'Resolved', 
-      color: 'bg-green-100 text-green-800 border-green-200',
+    resolved: {
+      label: "Resolved",
+      color: "bg-green-100 text-green-800 border-green-200",
       icon: CheckCircle,
-      description: 'Your complaint has been resolved. Thank you for your feedback.'
+      description:
+        "Your complaint has been resolved. Thank you for your feedback.",
     },
-  }
+  };
 
   const handleSearch = async (e) => {
-    e.preventDefault()
-    setError('')
-    setComplaint(null)
-    setAuditTrail([])
-    setLoading(true)
-    setSearched(true)
+    e.preventDefault();
+    setError("");
+    setComplaint(null);
+    setAuditTrail([]);
+    setLoading(true);
+    setSearched(true);
+    setAdditionalInfo("");
+    setInfoSuccess(false);
 
     try {
       const { data, error: fetchError } = await supabase
-        .from('complaints')
-        .select('*')
-        .eq('reference_number', referenceNumber.toUpperCase())
-        .single()
+        .from("complaints")
+        .select("*")
+        .eq("reference_number", referenceNumber.toUpperCase())
+        .single();
 
       if (fetchError) {
-        if (fetchError.code === 'PGRST116') {
-          setError('No complaint found with this reference number.')
+        if (fetchError.code === "PGRST116") {
+          setError("No complaint found with this reference number.");
         } else {
-          throw fetchError
+          throw fetchError;
         }
-        setLoading(false)
-        return
+        setLoading(false);
+        return;
       }
 
-      setComplaint(data)
+      setComplaint(data);
 
       const { data: trailData } = await supabase
-        .from('audit_trail')
-        .select('*')
-        .eq('complaint_id', data.id)
-        .order('created_at', { ascending: true })
+        .from("audit_trail")
+        .select("*")
+        .eq("complaint_id", data.id)
+        .order("created_at", { ascending: true });
 
       if (trailData) {
-        setAuditTrail(trailData)
+        setAuditTrail(trailData);
       }
     } catch (err) {
-      setError(err.message || 'Failed to fetch complaint. Please try again.')
+      setError(err.message || "Failed to fetch complaint. Please try again.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
+
+  const handleSendAdditionalInfo = async () => {
+    if (!additionalInfo.trim()) {
+      setError("Please enter additional information before sending");
+      return;
+    }
+
+    setSendingInfo(true);
+    setError("");
+
+    try {
+      const updatedDescription = `${complaint.description}\n\n--- Additional Information ---\n${additionalInfo}`;
+
+      const { error: updateError } = await supabase
+        .from("complaints")
+        .update({ description: updatedDescription })
+        .eq("id", complaint.id);
+
+      if (updateError) throw updateError;
+
+      await supabase.from("audit_trail").insert({
+        complaint_id: complaint.id,
+        action: "Additional Information Provided",
+        details: additionalInfo,
+      });
+
+      const { data: updatedComplaint } = await supabase
+        .from("complaints")
+        .select("*")
+        .eq("id", complaint.id)
+        .single();
+
+      if (updatedComplaint) {
+        setComplaint(updatedComplaint);
+      }
+
+      const { data: trailData } = await supabase
+        .from("audit_trail")
+        .select("*")
+        .eq("complaint_id", complaint.id)
+        .order("created_at", { ascending: true });
+
+      if (trailData) {
+        setAuditTrail(trailData);
+      }
+
+      setAdditionalInfo("");
+      setInfoSuccess(true);
+      setTimeout(() => setInfoSuccess(false), 3000);
+    } catch (err) {
+      setError(err.message || "Failed to send additional information");
+    } finally {
+      setSendingInfo(false);
+    }
+  };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  }
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   const StatusBadge = ({ status }) => {
-    const config = statusConfig[status] || statusConfig.submitted
-    const Icon = config.icon
+    const config = statusConfig[status] || statusConfig.submitted;
+    const Icon = config.icon;
     return (
-      <span className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-sm font-medium border ${config.color}`}>
+      <span
+        className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-sm font-medium border ${config.color}`}
+      >
         <Icon size={16} />
         <span>{config.label}</span>
       </span>
-    )
-  }
+    );
+  };
 
   return (
     <div className="min-h-[calc(100vh-200px)] py-12 px-4 sm:px-6 lg:px-8 bg-gray-50">
@@ -128,13 +196,20 @@ const TrackComplaint = () => {
           <div className="w-16 h-16 bg-maroon-800 rounded-full flex items-center justify-center mx-auto mb-4">
             <Search size={32} className="text-gold-400" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Track Your Complaint</h1>
-          <p className="text-gray-600 mt-2">Enter your reference number to check the status</p>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Track Your Complaint
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Enter your reference number to check the status
+          </p>
         </div>
 
         {/* Search Form */}
         <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100 mb-8">
-          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-4">
+          <form
+            onSubmit={handleSearch}
+            className="flex flex-col sm:flex-row gap-4"
+          >
             <div className="flex-1 relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <Tag size={20} className="text-gray-400" />
@@ -168,7 +243,10 @@ const TrackComplaint = () => {
         {/* Error Message */}
         {error && (
           <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start space-x-3">
-            <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
+            <AlertCircle
+              size={20}
+              className="text-red-500 flex-shrink-0 mt-0.5"
+            />
             <p className="text-red-700">{error}</p>
           </div>
         )}
@@ -181,48 +259,68 @@ const TrackComplaint = () => {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
                   <p className="text-sm text-gray-500 mb-1">Reference Number</p>
-                  <p className="text-xl font-bold text-maroon-800 font-mono">{complaint.reference_number}</p>
+                  <p className="text-xl font-bold text-maroon-800 font-mono">
+                    {complaint.reference_number}
+                  </p>
                 </div>
                 <StatusBadge status={complaint.status} />
               </div>
 
-              <div className={`p-4 rounded-xl border ${statusConfig[complaint.status]?.color || 'bg-gray-100'}`}>
-                <p className="text-sm">{statusConfig[complaint.status]?.description}</p>
+              <div
+                className={`p-4 rounded-xl border ${
+                  statusConfig[complaint.status]?.color || "bg-gray-100"
+                }`}
+              >
+                <p className="text-sm">
+                  {statusConfig[complaint.status]?.description}
+                </p>
               </div>
             </div>
 
             {/* Complaint Info */}
             <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Complaint Details</h3>
-              
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Complaint Details
+              </h3>
+
               <div className="grid md:grid-cols-2 gap-4 mb-6">
                 <div className="flex items-start space-x-3">
                   <User size={20} className="text-gray-400 mt-0.5" />
                   <div>
                     <p className="text-sm text-gray-500">Submitted By</p>
-                    <p className="font-medium text-gray-900">{complaint.name}</p>
+                    <p className="font-medium text-gray-900">
+                      {complaint.name}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <Tag size={20} className="text-gray-400 mt-0.5" />
                   <div>
                     <p className="text-sm text-gray-500">Category</p>
-                    <p className="font-medium text-gray-900 capitalize">{complaint.category}</p>
+                    <p className="font-medium text-gray-900 capitalize">
+                      {complaint.category}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3">
                   <Calendar size={20} className="text-gray-400 mt-0.5" />
                   <div>
                     <p className="text-sm text-gray-500">Date Submitted</p>
-                    <p className="font-medium text-gray-900">{formatDate(complaint.created_at)}</p>
+                    <p className="font-medium text-gray-900">
+                      {formatDate(complaint.created_at)}
+                    </p>
                   </div>
                 </div>
                 {complaint.assigned_department && (
                   <div className="flex items-start space-x-3">
                     <Building2 size={20} className="text-gray-400 mt-0.5" />
                     <div>
-                      <p className="text-sm text-gray-500">Assigned Department</p>
-                      <p className="font-medium text-gray-900 capitalize">{complaint.assigned_department}</p>
+                      <p className="text-sm text-gray-500">
+                        Assigned Department
+                      </p>
+                      <p className="font-medium text-gray-900 capitalize">
+                        {complaint.assigned_department}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -233,7 +331,9 @@ const TrackComplaint = () => {
                   <MessageSquare size={20} className="text-gray-400 mt-0.5" />
                   <div className="flex-1">
                     <p className="text-sm text-gray-500 mb-1">Description</p>
-                    <p className="text-gray-700 whitespace-pre-wrap">{complaint.description}</p>
+                    <p className="text-gray-700 whitespace-pre-wrap">
+                      {complaint.description}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -244,7 +344,9 @@ const TrackComplaint = () => {
                     <CheckCircle size={20} className="text-green-500 mt-0.5" />
                     <div className="flex-1">
                       <p className="text-sm text-gray-500 mb-1">Resolution</p>
-                      <p className="text-gray-700 whitespace-pre-wrap">{complaint.resolution_details}</p>
+                      <p className="text-gray-700 whitespace-pre-wrap">
+                        {complaint.resolution_details}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -255,29 +357,100 @@ const TrackComplaint = () => {
                   <div className="flex items-start space-x-3">
                     <AlertCircle size={20} className="text-orange-500 mt-0.5" />
                     <div className="flex-1">
-                      <p className="text-sm text-gray-500 mb-1">Admin Remarks</p>
-                      <p className="text-gray-700 whitespace-pre-wrap">{complaint.admin_remarks}</p>
+                      <p className="text-sm text-gray-500 mb-1">
+                        Admin Remarks
+                      </p>
+                      <p className="text-gray-700 whitespace-pre-wrap">
+                        {complaint.admin_remarks}
+                      </p>
                     </div>
                   </div>
                 </div>
               )}
             </div>
 
+            {/* Send Additional Information */}
+            {complaint.status !== "resolved" &&
+              complaint.status !== "rejected" && (
+                <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Info size={20} className="text-maroon-800" />
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Send Additional Information
+                    </h3>
+                  </div>
+
+                  {infoSuccess && (
+                    <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl flex items-start space-x-2">
+                      <CheckCircle
+                        size={18}
+                        className="text-green-500 flex-shrink-0 mt-0.5"
+                      />
+                      <p className="text-green-700 text-sm">
+                        Additional information sent successfully!
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <textarea
+                      value={additionalInfo}
+                      onChange={(e) => setAdditionalInfo(e.target.value)}
+                      rows={4}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 outline-none resize-none"
+                      placeholder="Provide any additional details or updates about your complaint..."
+                    />
+                    <button
+                      onClick={handleSendAdditionalInfo}
+                      disabled={sendingInfo || !additionalInfo.trim()}
+                      className="w-full bg-maroon-800 text-white py-3 px-4 rounded-xl font-semibold hover:bg-maroon-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {sendingInfo ? (
+                        <Loader2 size={20} className="animate-spin" />
+                      ) : (
+                        <>
+                          <Send size={20} />
+                          <span>Send Additional Information</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
             {/* Audit Trail */}
             {auditTrail.length > 0 && (
               <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Activity Timeline</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Activity Timeline
+                </h3>
                 <div className="space-y-4">
                   {auditTrail.map((entry, index) => (
                     <div key={entry.id} className="flex space-x-4">
                       <div className="flex flex-col items-center">
-                        <div className={`w-3 h-3 rounded-full ${index === auditTrail.length - 1 ? 'bg-maroon-800' : 'bg-gray-300'}`}></div>
-                        {index < auditTrail.length - 1 && <div className="w-0.5 h-full bg-gray-200 mt-1"></div>}
+                        <div
+                          className={`w-3 h-3 rounded-full ${
+                            index === auditTrail.length - 1
+                              ? "bg-maroon-800"
+                              : "bg-gray-300"
+                          }`}
+                        ></div>
+                        {index < auditTrail.length - 1 && (
+                          <div className="w-0.5 h-full bg-gray-200 mt-1"></div>
+                        )}
                       </div>
                       <div className="flex-1 pb-4">
-                        <p className="font-medium text-gray-900">{entry.action}</p>
-                        <p className="text-sm text-gray-500">{formatDate(entry.created_at)}</p>
-                        {entry.details && <p className="text-sm text-gray-600 mt-1">{entry.details}</p>}
+                        <p className="font-medium text-gray-900">
+                          {entry.action}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {formatDate(entry.created_at)}
+                        </p>
+                        {entry.details && (
+                          <p className="text-sm text-gray-600 mt-1">
+                            {entry.details}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -293,13 +466,17 @@ const TrackComplaint = () => {
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Search size={32} className="text-gray-400" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Results Found</h3>
-            <p className="text-gray-600">Please check your reference number and try again.</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              No Results Found
+            </h3>
+            <p className="text-gray-600">
+              Please check your reference number and try again.
+            </p>
           </div>
         )}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default TrackComplaint
+export default TrackComplaint;

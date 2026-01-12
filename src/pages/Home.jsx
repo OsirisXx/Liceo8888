@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import {
@@ -32,12 +32,74 @@ const Home = () => {
   const [showPersonalDetails, setShowPersonalDetails] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
+  const [showCategoryReminder, setShowCategoryReminder] = useState(false);
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [displayedPlaceholder, setDisplayedPlaceholder] = useState("");
+  const [isTyping, setIsTyping] = useState(true);
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertMessage, setAlertMessage] = useState({ title: "", details: [] });
+  const [fieldErrors, setFieldErrors] = useState({
+    complaint: false,
+    category: false,
+  });
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsSuccess, setDetailsSuccess] = useState(false);
+
+  const placeholderTexts = [
+    "Share your concern with us - we're here to help...",
+    "Report issues about facilities, academics, or services...",
+    "Your feedback helps improve our university community...",
+    "Experiencing problems on campus? Let us know here...",
+    "We value your voice - every complaint is reviewed carefully...",
+    "Help us serve you better by sharing your concerns...",
+    "From classroom issues to campus safety - we listen...",
+    "Anonymous submissions welcome - your privacy matters...",
+    "Together we can make Liceo a better place for everyone...",
+  ];
   const [personalDetails, setPersonalDetails] = useState({
     name: "",
     email: "",
     studentId: "",
     isAnonymous: false,
   });
+
+  useEffect(() => {
+    const currentText = placeholderTexts[placeholderIndex];
+    let charIndex = 0;
+    let typingTimeout;
+    let eraseTimeout;
+
+    if (isTyping) {
+      const typeChar = () => {
+        if (charIndex <= currentText.length) {
+          setDisplayedPlaceholder(currentText.slice(0, charIndex));
+          charIndex++;
+          typingTimeout = setTimeout(typeChar, 50);
+        } else {
+          setTimeout(() => setIsTyping(false), 2000);
+        }
+      };
+      typeChar();
+    } else {
+      charIndex = currentText.length;
+      const eraseChar = () => {
+        if (charIndex >= 0) {
+          setDisplayedPlaceholder(currentText.slice(0, charIndex));
+          charIndex--;
+          eraseTimeout = setTimeout(eraseChar, 30);
+        } else {
+          setPlaceholderIndex((prev) => (prev + 1) % placeholderTexts.length);
+          setIsTyping(true);
+        }
+      };
+      eraseChar();
+    }
+
+    return () => {
+      clearTimeout(typingTimeout);
+      clearTimeout(eraseTimeout);
+    };
+  }, [placeholderIndex, isTyping]);
 
   const categories = [
     { value: "academic", label: "Academic" },
@@ -161,12 +223,25 @@ const Home = () => {
     e.preventDefault();
     setError("");
 
-    if (!complaint.trim()) {
-      setError("Please enter your complaint");
-      return;
-    }
-    if (!category) {
-      setError("Please select a category");
+    const errors = {
+      complaint: !complaint.trim(),
+      category: !category,
+    };
+    setFieldErrors(errors);
+
+    if (errors.complaint || errors.category) {
+      const missingFields = [];
+      if (errors.complaint) missingFields.push("Your complaint message");
+      if (errors.category) missingFields.push("Category selection");
+      setAlertMessage({
+        title: "Please complete the following:",
+        details: missingFields,
+      });
+      setShowAlert(true);
+      setTimeout(
+        () => setFieldErrors({ complaint: false, category: false }),
+        600
+      );
       return;
     }
     setLoading(true);
@@ -329,19 +404,25 @@ const Home = () => {
                 {/* Complaint textarea */}
                 <div
                   className={`backdrop-blur-sm border-2 rounded-2xl p-4 mb-4 transition-all duration-300 ${
-                    isFocused
+                    fieldErrors.complaint
+                      ? "bg-red-500/20 border-red-400 animate-shake"
+                      : isFocused
                       ? "bg-white/20 border-gold-400 shadow-lg shadow-gold-500/20"
                       : "bg-white/10 border-white/30"
                   }`}
                 >
                   <textarea
                     value={complaint}
-                    onChange={(e) => setComplaint(e.target.value)}
+                    onChange={(e) => {
+                      setComplaint(e.target.value);
+                      setShowAlert(false);
+                      setFieldErrors((prev) => ({ ...prev, complaint: false }));
+                    }}
                     onFocus={() => setIsFocused(true)}
                     onBlur={() => setIsFocused(false)}
-                    placeholder="Type your complaint here... What concern would you like to share?"
+                    placeholder={displayedPlaceholder || "|"}
                     rows={3}
-                    className="w-full bg-transparent text-white placeholder-gray-300 focus:outline-none resize-none"
+                    className="w-full bg-transparent text-white placeholder-gray-300 focus:outline-none resize-none transition-all"
                   />
 
                   {/* Image previews */}
@@ -367,8 +448,42 @@ const Home = () => {
                   )}
 
                   {/* Action buttons row */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-3 pt-3 border-t border-white/20">
-                    <div className="flex items-center justify-between sm:justify-start gap-2 flex-1">
+                  <div className="flex flex-row items-center gap-2 sm:gap-3 mt-3 pt-3 border-t border-white/20">
+                    <div className="flex items-center gap-2 flex-1">
+                      {/* Category selector - moved to left of images */}
+                      <select
+                        value={category}
+                        onChange={(e) => {
+                          setCategory(e.target.value);
+                          setShowCategoryReminder(false);
+                          setShowAlert(false);
+                          setFieldErrors((prev) => ({
+                            ...prev,
+                            category: false,
+                          }));
+                        }}
+                        className={`bg-white/10 border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-400 transition-all ${
+                          fieldErrors.category
+                            ? "border-red-400 bg-red-500/20 animate-shake"
+                            : showCategoryReminder
+                            ? "border-gold-400 animate-pulse"
+                            : "border-white/30"
+                        }`}
+                      >
+                        <option value="" className="text-gray-900">
+                          Category
+                        </option>
+                        {categories.map((cat) => (
+                          <option
+                            key={cat.value}
+                            value={cat.value}
+                            className="text-gray-900"
+                          >
+                            {cat.label}
+                          </option>
+                        ))}
+                      </select>
+
                       {/* Image upload button */}
                       <label className="cursor-pointer p-2 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-2">
                         <ImagePlus size={20} className="text-gold-400" />
@@ -387,44 +502,24 @@ const Home = () => {
                       </label>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {/* Category selector */}
-                      <select
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                        className="bg-white/10 border border-white/30 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-400 flex-1 sm:flex-none"
-                      >
-                        <option value="" className="text-gray-900">
-                          Category
-                        </option>
-                        {categories.map((cat) => (
-                          <option
-                            key={cat.value}
-                            value={cat.value}
-                            className="text-gray-900"
-                          >
-                            {cat.label}
-                          </option>
-                        ))}
-                      </select>
-
-                      {/* Submit button */}
-                      <button
-                        type="submit"
-                        disabled={loading || !complaint.trim() || !category}
-                        className={`p-3 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
-                          complaint.trim() && category
-                            ? "bg-gold-400 text-maroon-900 hover:bg-gold-300 shadow-lg shadow-gold-500/30"
-                            : "bg-gold-500 text-maroon-900 hover:bg-gold-400"
-                        }`}
-                      >
-                        {loading ? (
-                          <Loader2 size={20} className="animate-spin" />
-                        ) : (
-                          <Send size={20} />
-                        )}
-                      </button>
-                    </div>
+                    {/* Submit button */}
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className={`p-3 rounded-xl transition-all duration-200 flex-shrink-0 ${
+                        loading
+                          ? "opacity-50 cursor-not-allowed"
+                          : complaint.trim() && category
+                          ? "bg-gold-400 text-maroon-900 hover:bg-gold-300 hover:scale-110 active:scale-95 shadow-lg shadow-gold-500/30"
+                          : "bg-gold-500/70 text-maroon-900 hover:bg-gold-400 hover:scale-110 active:scale-95"
+                      }`}
+                    >
+                      {loading ? (
+                        <Loader2 size={20} className="animate-spin" />
+                      ) : (
+                        <Send size={20} />
+                      )}
+                    </button>
                   </div>
                 </div>
 
@@ -439,7 +534,7 @@ const Home = () => {
             <div className="mt-6">
               <Link
                 to="/track"
-                className="inline-flex items-center space-x-2 text-gold-300 hover:text-gold-400 transition-colors"
+                className="inline-flex items-center space-x-2 text-gold-300 hover:text-gold-400 hover:scale-105 active:scale-95 transition-all"
               >
                 <Search size={18} />
                 <span>Already submitted? Track your complaint</span>
@@ -449,6 +544,43 @@ const Home = () => {
         </div>
       </section>
 
+      {/* Soft Alert Toast for missing fields */}
+      {showAlert && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top fade-in duration-300 w-[90%] sm:w-auto">
+          <div className="bg-white rounded-xl px-3 sm:px-5 py-3 sm:py-4 shadow-2xl border border-gray-200 max-w-sm">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <Shield size={16} className="text-red-500 sm:hidden" />
+                <Shield size={20} className="text-red-500 hidden sm:block" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold text-gray-900 text-xs sm:text-sm mb-1">
+                  {alertMessage.title}
+                </h4>
+                <ul className="space-y-0.5 sm:space-y-1">
+                  {alertMessage.details.map((item, index) => (
+                    <li
+                      key={index}
+                      className="text-[10px] sm:text-xs text-gray-600 flex items-center gap-1 sm:gap-1.5"
+                    >
+                      <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-red-400 rounded-full flex-shrink-0"></span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                onClick={() => setShowAlert(false)}
+                className="p-1 hover:bg-gray-100 hover:scale-110 active:scale-95 rounded-full transition-all"
+              >
+                <X size={14} className="text-gray-400 sm:hidden" />
+                <X size={16} className="text-gray-400 hidden sm:block" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Success Popup Modal */}
       {showPopup && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -456,9 +588,10 @@ const Home = () => {
             {/* Close button */}
             <button
               onClick={closePopup}
-              className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 p-1.5 sm:p-2 hover:bg-gray-100 hover:scale-110 active:scale-95 rounded-full transition-all"
             >
-              <X size={20} className="text-gray-500" />
+              <X size={18} className="text-gray-500 sm:hidden" />
+              <X size={20} className="text-gray-500 hidden sm:block" />
             </button>
 
             <div className="text-center">
@@ -483,7 +616,7 @@ const Home = () => {
                   </span>
                   <button
                     onClick={copyToClipboard}
-                    className="p-2 hover:bg-maroon-100 rounded-lg transition-colors flex-shrink-0"
+                    className="p-2 hover:bg-maroon-100 hover:scale-110 active:scale-95 rounded-lg transition-all flex-shrink-0"
                     title="Copy to clipboard"
                   >
                     <Copy
@@ -504,7 +637,7 @@ const Home = () => {
                 <button
                   type="button"
                   onClick={() => setShowPersonalDetails(!showPersonalDetails)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-100 transition-colors"
+                  className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-100 active:bg-gray-200 transition-all"
                 >
                   <span className="text-sm text-gray-700 font-medium">
                     Add additional details (optional)
@@ -579,21 +712,72 @@ const Home = () => {
                         className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-maroon-500 focus:ring-1 focus:ring-maroon-500"
                       />
                     </div>
+
+                    {/* Send button for additional details */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setDetailsLoading(true);
+                        try {
+                          const { error: updateError } = await supabase
+                            .from("complaints")
+                            .update({
+                              name: personalDetails.isAnonymous
+                                ? "Anonymous"
+                                : personalDetails.name || "Anonymous",
+                              email: personalDetails.email || null,
+                              student_id: personalDetails.studentId || null,
+                              is_anonymous:
+                                personalDetails.isAnonymous ||
+                                !personalDetails.name,
+                            })
+                            .eq("reference_number", referenceNumber);
+                          if (!updateError) {
+                            setShowPersonalDetails(false);
+                            setDetailsSuccess(true);
+                            setTimeout(() => setDetailsSuccess(false), 3000);
+                          }
+                        } catch (err) {
+                          console.error("Error updating details:", err);
+                        } finally {
+                          setDetailsLoading(false);
+                        }
+                      }}
+                      disabled={detailsLoading}
+                      className="w-full flex items-center justify-center gap-2 bg-maroon-800 text-white px-4 py-2.5 rounded-lg font-medium hover:bg-maroon-700 active:bg-maroon-900 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {detailsLoading ? (
+                        <Loader2 size={18} className="animate-spin" />
+                      ) : (
+                        <>
+                          <Send size={16} />
+                          <span>Save Details</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 )}
               </div>
 
+              {/* Success alert for details saved */}
+              {detailsSuccess && (
+                <div className="mb-4 p-2 sm:p-3 bg-green-100 border border-green-300 rounded-xl text-green-700 text-xs sm:text-sm flex items-center gap-2">
+                  <CheckCircle size={16} className="flex-shrink-0" />
+                  <span>Details saved successfully!</span>
+                </div>
+              )}
+
               <div className="flex flex-col gap-3">
                 <Link
                   to="/track"
-                  className="inline-flex items-center justify-center space-x-2 bg-maroon-800 text-white px-6 py-3 rounded-xl font-semibold hover:bg-maroon-700 transition-all"
+                  className="inline-flex items-center justify-center space-x-2 bg-maroon-800 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold hover:bg-maroon-700 active:bg-maroon-900 active:scale-[0.98] transition-all duration-200 shadow-md"
                 >
                   <Search size={18} />
                   <span>Track Your Complaint</span>
                 </Link>
                 <button
                   onClick={closePopup}
-                  className="inline-flex items-center justify-center space-x-2 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-200 transition-all"
+                  className="inline-flex items-center justify-center space-x-2 bg-gray-100 text-gray-700 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold hover:bg-gray-200 active:bg-gray-300 active:scale-[0.98] transition-all duration-200"
                 >
                   <span>Close</span>
                 </button>
@@ -615,21 +799,27 @@ const Home = () => {
               transparent and efficient way to address your concerns.
             </p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8">
             {features.map((feature, index) => (
               <div
                 key={index}
-                className="bg-gray-50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300 border border-gray-100 hover:border-gold-300"
+                className="bg-gray-50 rounded-2xl p-4 sm:p-6 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 border border-gray-100 hover:border-gold-300 text-center sm:text-left cursor-pointer"
               >
                 <div
-                  className={`${feature.color} w-14 h-14 rounded-xl flex items-center justify-center mb-4`}
+                  className={`${feature.color} w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center mb-3 sm:mb-4 mx-auto sm:mx-0`}
                 >
-                  <feature.icon size={28} className="text-white" />
+                  <feature.icon size={24} className="text-white sm:hidden" />
+                  <feature.icon
+                    size={28}
+                    className="text-white hidden sm:block"
+                  />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1 sm:mb-2">
                   {feature.title}
                 </h3>
-                <p className="text-gray-600">{feature.description}</p>
+                <p className="text-sm sm:text-base text-gray-600">
+                  {feature.description}
+                </p>
               </div>
             ))}
           </div>
@@ -647,17 +837,19 @@ const Home = () => {
               A simple four-step process to get your concerns addressed
             </p>
           </div>
-          <div className="grid md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-8">
             {steps.map((step, index) => (
               <div key={index} className="relative">
-                <div className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 border border-gray-100">
-                  <span className="text-5xl font-bold text-maroon-100">
+                <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 border border-gray-100 text-center sm:text-left cursor-pointer">
+                  <span className="text-3xl sm:text-5xl font-bold text-maroon-100">
                     {step.number}
                   </span>
-                  <h3 className="text-xl font-semibold text-maroon-800 mt-2 mb-2">
+                  <h3 className="text-base sm:text-xl font-semibold text-maroon-800 mt-1 sm:mt-2 mb-1 sm:mb-2">
                     {step.title}
                   </h3>
-                  <p className="text-gray-600">{step.description}</p>
+                  <p className="text-xs sm:text-base text-gray-600">
+                    {step.description}
+                  </p>
                 </div>
                 {index < steps.length - 1 && (
                   <div className="hidden md:block absolute top-1/2 -right-4 w-8 h-0.5 bg-gold-400"></div>
@@ -680,7 +872,7 @@ const Home = () => {
           </p>
           <Link
             to="/track"
-            className="inline-flex items-center space-x-2 bg-gold-500 text-maroon-900 px-8 py-4 rounded-xl font-semibold hover:bg-gold-400 transition-all duration-200 shadow-lg"
+            className="inline-flex items-center space-x-2 bg-gold-500 text-maroon-900 px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-semibold hover:bg-gold-400 active:bg-gold-600 active:scale-95 transition-all duration-200 shadow-lg"
           >
             <Search size={20} />
             <span>Track Your Complaint</span>

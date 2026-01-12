@@ -34,6 +34,8 @@ const SubmitComplaint = () => {
   const [success, setSuccess] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState("");
   const [copied, setCopied] = useState(false);
+  const [categoryReminder, setCategoryReminder] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
   const categories = [
     {
@@ -103,7 +105,18 @@ const SubmitComplaint = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setCategoryReminder(false);
     setLoading(true);
+
+    // Validate category is selected
+    if (!formData.category) {
+      setCategoryReminder(true);
+      setError(
+        "Please select a category for your complaint so we can direct it to the right department 😊"
+      );
+      setLoading(false);
+      return;
+    }
 
     // Validate attachment is provided
     if (!attachment) {
@@ -119,7 +132,7 @@ const SubmitComplaint = () => {
       if (attachment) {
         const fileExt = attachment.name.split(".").pop();
         const fileName = `${refNumber}.${fileExt}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from("attachments")
           .upload(fileName, attachment);
 
@@ -351,47 +364,6 @@ const SubmitComplaint = () => {
               </div>
             </div>
 
-            {/* Category */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Category <span className="text-red-500">*</span>
-              </label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {categories.map((cat) => (
-                  <label
-                    key={cat.value}
-                    className={`relative flex flex-col p-4 border rounded-xl cursor-pointer transition-all duration-200 ${
-                      formData.category === cat.value
-                        ? "border-maroon-500 bg-maroon-50 ring-2 ring-maroon-500"
-                        : "border-gray-200 hover:border-maroon-300 hover:bg-gray-50"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="category"
-                      value={cat.value}
-                      checked={formData.category === cat.value}
-                      onChange={handleChange}
-                      required
-                      className="sr-only"
-                    />
-                    <span
-                      className={`font-medium ${
-                        formData.category === cat.value
-                          ? "text-maroon-800"
-                          : "text-gray-700"
-                      }`}
-                    >
-                      {cat.label}
-                    </span>
-                    <span className="text-xs text-gray-500 mt-1">
-                      {cat.description}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
             {/* Description */}
             <div>
               <label
@@ -420,43 +392,147 @@ const SubmitComplaint = () => {
               </p>
             </div>
 
-            {/* Attachment - Required */}
+            {/* Category & Attachment - Side by Side Buttons */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Evidence Image <span className="text-red-500">*</span>
+                Category & Evidence <span className="text-red-500">*</span>
               </label>
-              <div className="relative">
-                <input
-                  type="file"
-                  onChange={handleFileChange}
-                  accept="image/*"
-                  className="hidden"
-                  id="attachment"
-                  required
-                />
-                <label
-                  htmlFor="attachment"
-                  className={`flex items-center justify-center space-x-2 w-full py-4 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 ${
-                    attachment
+
+              {/* Category Reminder */}
+              {categoryReminder && (
+                <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-start space-x-2">
+                  <AlertCircle
+                    size={18}
+                    className="text-blue-500 flex-shrink-0 mt-0.5"
+                  />
+                  <p className="text-blue-700 text-sm">
+                    Please select a category so we can direct your complaint to
+                    the right department. This helps us serve you better! 😊
+                  </p>
+                </div>
+              )}
+
+              {/* Side by Side Buttons */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Category Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryPicker(!showCategoryPicker)}
+                  className={`flex items-center justify-center space-x-2 py-4 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 ${
+                    formData.category
                       ? "border-green-400 bg-green-50"
+                      : categoryReminder
+                      ? "border-red-400 bg-red-50"
                       : "border-gray-300 hover:border-maroon-400 hover:bg-gray-50"
                   }`}
                 >
-                  <Paperclip
+                  <Tag
                     size={20}
-                    className={attachment ? "text-green-500" : "text-gray-400"}
+                    className={
+                      formData.category
+                        ? "text-green-500"
+                        : categoryReminder
+                        ? "text-red-500"
+                        : "text-gray-400"
+                    }
                   />
                   <span
-                    className={attachment ? "text-green-700" : "text-gray-600"}
+                    className={
+                      formData.category
+                        ? "text-green-700"
+                        : categoryReminder
+                        ? "text-red-700"
+                        : "text-gray-600"
+                    }
                   >
-                    {attachment
-                      ? attachment.name
-                      : "Click to upload an image (required, max 5MB)"}
+                    {formData.category
+                      ? categories.find((c) => c.value === formData.category)
+                          ?.label
+                      : "Select Category"}
                   </span>
-                </label>
+                </button>
+
+                {/* Image Button */}
+                <div className="relative">
+                  <input
+                    type="file"
+                    onChange={handleFileChange}
+                    accept="image/*"
+                    className="hidden"
+                    id="attachment"
+                  />
+                  <label
+                    htmlFor="attachment"
+                    className={`flex items-center justify-center space-x-2 w-full py-4 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 ${
+                      attachment
+                        ? "border-green-400 bg-green-50"
+                        : "border-gray-300 hover:border-maroon-400 hover:bg-gray-50"
+                    }`}
+                  >
+                    <Paperclip
+                      size={20}
+                      className={
+                        attachment ? "text-green-500" : "text-gray-400"
+                      }
+                    />
+                    <span
+                      className={
+                        attachment ? "text-green-700 truncate" : "text-gray-600"
+                      }
+                    >
+                      {attachment ? "Image Added" : "Add Image"}
+                    </span>
+                  </label>
+                </div>
               </div>
+
+              {/* Category Picker Dropdown */}
+              {showCategoryPicker && (
+                <div className="mt-3 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                  <p className="text-sm font-medium text-gray-700 mb-3">
+                    Select a category:
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.value}
+                        type="button"
+                        onClick={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            category: cat.value,
+                          }));
+                          setCategoryReminder(false);
+                          setShowCategoryPicker(false);
+                        }}
+                        className={`flex flex-col p-3 border rounded-lg text-left transition-all duration-200 ${
+                          formData.category === cat.value
+                            ? "border-maroon-500 bg-maroon-50 ring-2 ring-maroon-500"
+                            : "border-gray-200 hover:border-maroon-300 hover:bg-white"
+                        }`}
+                      >
+                        <span
+                          className={`font-medium text-sm ${
+                            formData.category === cat.value
+                              ? "text-maroon-800"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          {cat.label}
+                        </span>
+                        <span className="text-xs text-gray-500 mt-0.5">
+                          {cat.description}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Image Preview */}
               {attachment && (
                 <div className="mt-3">
+                  <p className="text-sm text-gray-500 mb-2">Image Preview:</p>
                   <img
                     src={URL.createObjectURL(attachment)}
                     alt="Preview"
@@ -471,8 +547,9 @@ const SubmitComplaint = () => {
                   </button>
                 </div>
               )}
-              <p className="text-sm text-gray-500 mt-1">
-                Upload an image as evidence (JPG, PNG, GIF - max 5MB)
+
+              <p className="text-sm text-gray-500 mt-2">
+                Both category and evidence image are required
               </p>
             </div>
 
