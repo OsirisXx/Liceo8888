@@ -96,7 +96,9 @@ const ticketReferenceBox = (referenceNumber) => `
 `;
 
 /**
- * Send email using Vercel API route (works on deployed site)
+ * Send email - uses /api/send-email endpoint
+ * In development: Vite proxies to local dev server (localhost:3001)
+ * In production: Vercel serverless function handles the request
  */
 export const sendEmail = async ({ to, subject, html }) => {
   if (!to) {
@@ -117,7 +119,20 @@ export const sendEmail = async ({ to, subject, html }) => {
       }),
     });
 
-    const data = await response.json();
+    // Check if response has content before parsing JSON
+    const text = await response.text();
+    if (!text) {
+      console.error("Empty response from email API");
+      return { success: false, error: "Empty response from server" };
+    }
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (parseError) {
+      console.error("Failed to parse response:", text);
+      return { success: false, error: "Invalid response from server" };
+    }
 
     if (!response.ok) {
       console.error("Email API error:", data);

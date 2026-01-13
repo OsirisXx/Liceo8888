@@ -1,6 +1,6 @@
-// Vercel Serverless Function to send emails via Nodemailer + Resend SMTP
+// Vercel Serverless Function to send emails via Resend SDK
 
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 export default async function handler(req, res) {
     // Set CORS headers
@@ -18,9 +18,14 @@ export default async function handler(req, res) {
         return res.status(405).json({ error: "Method not allowed" });
     }
 
-    if (!process.env.RESEND_API_KEY) {
+    const apiKey = process.env.RESEND_API_KEY;
+    
+    if (!apiKey) {
         console.error("RESEND_API_KEY not configured");
-        return res.status(500).json({ error: "Email service not configured. RESEND_API_KEY is missing." });
+        return res.status(500).json({ 
+            error: "Email service not configured. RESEND_API_KEY is missing.",
+            debug: "Please add RESEND_API_KEY to your Vercel environment variables"
+        });
     }
 
     try {
@@ -30,28 +35,25 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: "Missing required fields: to, subject, html" });
         }
 
-        // Create transporter inside handler to ensure env vars are available
-        const transporter = nodemailer.createTransport({
-            host: "smtp.resend.com",
-            port: 465,
-            secure: true,
-            auth: {
-                user: "resend",
-                pass: process.env.RESEND_API_KEY,
-            },
-        });
+        // Initialize Resend with API key
+        const resend = new Resend(apiKey);
 
-        const info = await transporter.sendMail({
+        const { data, error } = await resend.emails.send({
             from: "Liceo 8888 <noreply@citattendance.info>",
-            to: Array.isArray(to) ? to.join(", ") : to,
+            to: Array.isArray(to) ? to : [to],
             subject,
             html,
         });
 
-        console.log("Email sent successfully:", info.messageId);
-        return res.status(200).json({ success: true, id: info.messageId });
+        if (error) {
+            console.error("Resend API error:", error);
+            return res.status(500).json({ error: error.message || "Failed to send email" });
+        }
+
+        console.log("Email sent successfully:", data.id);
+        return res.status(200).json({ success: true, id: data.id });
     } catch (error) {
         console.error("Error sending email:", error);
-        return res.status(500).json({ error: error.message });
+        return res.status(500).json({ error: error.message || "Unknown error occurred" });
     }
-};
+}
