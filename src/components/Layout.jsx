@@ -33,9 +33,9 @@ const Layout = ({ children }) => {
   const publicLinks = user
     ? []
     : [
-      { path: "/", label: "Home", icon: Home },
-      { path: "/track", label: "Track Status", icon: Search },
-    ];
+        { path: "/", label: "Home", icon: Home },
+        { path: "/track", label: "Track Status", icon: Search },
+      ];
 
   const superAdminLinks = [
     { path: "/super-admin", label: "Super Admin", icon: Shield },
@@ -161,14 +161,16 @@ const Layout = ({ children }) => {
       <header className="bg-maroon-800 text-white shadow-lg sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
-            <Link to="/" className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gold-500 rounded-full flex items-center justify-center">
-                <span className="text-maroon-800 font-bold text-lg">L</span>
+            {/* Logo - always on left */}
+            <Link to="/" className="flex items-center space-x-2 sm:space-x-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gold-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-maroon-800 font-bold text-sm sm:text-lg">
+                  L
+                </span>
               </div>
-              <div className="hidden sm:block">
-                <h1 className="text-lg font-bold">Liceo 8888</h1>
-                <p className="text-xs text-gold-300">
+              <div>
+                <h1 className="text-sm sm:text-lg font-bold">Liceo 8888</h1>
+                <p className="text-[10px] sm:text-xs text-gold-300">
                   Complaint Management System
                 </p>
               </div>
@@ -180,10 +182,11 @@ const Layout = ({ children }) => {
                 <Link
                   key={path}
                   to={path}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${isActive(path)
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                    isActive(path)
                       ? "bg-gold-500 text-maroon-800 font-semibold"
                       : "hover:bg-maroon-700 text-white"
-                    }`}
+                  }`}
                 >
                   <Icon size={18} />
                   <span>{label}</span>
@@ -196,10 +199,11 @@ const Layout = ({ children }) => {
                   <Link
                     key={path}
                     to={path}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${isActive(path)
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                      isActive(path)
                         ? "bg-gold-500 text-maroon-800 font-semibold"
                         : "hover:bg-maroon-700 text-white"
-                      }`}
+                    }`}
                   >
                     <Icon size={18} />
                     <span>{label}</span>
@@ -212,10 +216,11 @@ const Layout = ({ children }) => {
                   <Link
                     key={path}
                     to={path}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${isActive(path)
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                      isActive(path)
                         ? "bg-gold-500 text-maroon-800 font-semibold"
                         : "hover:bg-maroon-700 text-white"
-                      }`}
+                    }`}
                   >
                     <Icon size={18} />
                     <span>{label}</span>
@@ -228,10 +233,11 @@ const Layout = ({ children }) => {
                   <Link
                     key={path}
                     to={path}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${isActive(path)
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                      isActive(path)
                         ? "bg-gold-500 text-maroon-800 font-semibold"
                         : "hover:bg-maroon-700 text-white"
-                      }`}
+                    }`}
                   >
                     <Icon size={18} />
                     <span>{label}</span>
@@ -305,98 +311,113 @@ const Layout = ({ children }) => {
 
             {/* Mobile menu button */}
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-lg hover:bg-maroon-700 transition-colors"
+              onClick={(e) => {
+                e.currentTarget.blur();
+                setMobileMenuOpen(!mobileMenuOpen);
+              }}
+              className="md:hidden p-2 rounded-lg hover:bg-maroon-700 transition-colors focus:outline-none"
             >
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Navigation */}
+        {/* Mobile Navigation - Overlay */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-maroon-900 border-t border-maroon-700">
-            <nav className="px-4 py-3 space-y-1">
-              {publicLinks.map(({ path, label, icon: Icon }) => (
-                <Link
-                  key={path}
-                  to={path}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${isActive(path)
-                      ? "bg-gold-500 text-maroon-800 font-semibold"
-                      : "hover:bg-maroon-700 text-white"
+          <>
+            {/* Backdrop overlay */}
+            <div
+              className="md:hidden fixed inset-0 bg-black/50 z-40 animate-in fade-in duration-200"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            {/* Menu panel */}
+            <div className="md:hidden fixed top-16 left-0 right-0 bg-maroon-900 border-t border-maroon-700 z-50 shadow-xl animate-slide-down">
+              <nav className="px-4 py-3 space-y-1 max-h-[calc(100vh-4rem)] overflow-y-auto">
+                {publicLinks.map(({ path, label, icon: Icon }) => (
+                  <Link
+                    key={path}
+                    to={path}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                      isActive(path)
+                        ? "bg-gold-500 text-maroon-800 font-semibold"
+                        : "hover:bg-maroon-700 text-white"
                     }`}
-                >
-                  <Icon size={20} />
-                  <span>{label}</span>
-                </Link>
-              ))}
-
-              {user &&
-                userRole === "super_admin" &&
-                superAdminLinks.map(({ path, label, icon: Icon }) => (
-                  <Link
-                    key={path}
-                    to={path}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${isActive(path)
-                        ? "bg-gold-500 text-maroon-800 font-semibold"
-                        : "hover:bg-maroon-700 text-white"
-                      }`}
                   >
                     <Icon size={20} />
                     <span>{label}</span>
                   </Link>
                 ))}
 
-              {user &&
-                userRole === "admin" &&
-                adminLinks.map(({ path, label, icon: Icon }) => (
-                  <Link
-                    key={path}
-                    to={path}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${isActive(path)
-                        ? "bg-gold-500 text-maroon-800 font-semibold"
-                        : "hover:bg-maroon-700 text-white"
+                {user &&
+                  userRole === "super_admin" &&
+                  superAdminLinks.map(({ path, label, icon: Icon }) => (
+                    <Link
+                      key={path}
+                      to={path}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                        isActive(path)
+                          ? "bg-gold-500 text-maroon-800 font-semibold"
+                          : "hover:bg-maroon-700 text-white"
                       }`}
-                  >
-                    <Icon size={20} />
-                    <span>{label}</span>
-                  </Link>
-                ))}
+                    >
+                      <Icon size={20} />
+                      <span>{label}</span>
+                    </Link>
+                  ))}
 
-              {user &&
-                userRole === "department" &&
-                departmentLinks.map(({ path, label, icon: Icon }) => (
-                  <Link
-                    key={path}
-                    to={path}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${isActive(path)
-                        ? "bg-gold-500 text-maroon-800 font-semibold"
-                        : "hover:bg-maroon-700 text-white"
+                {user &&
+                  userRole === "admin" &&
+                  adminLinks.map(({ path, label, icon: Icon }) => (
+                    <Link
+                      key={path}
+                      to={path}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                        isActive(path)
+                          ? "bg-gold-500 text-maroon-800 font-semibold"
+                          : "hover:bg-maroon-700 text-white"
                       }`}
-                  >
-                    <Icon size={20} />
-                    <span>{label}</span>
-                  </Link>
-                ))}
+                    >
+                      <Icon size={20} />
+                      <span>{label}</span>
+                    </Link>
+                  ))}
 
-              {user && (
-                <button
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    handleSignOut();
-                  }}
-                  className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-maroon-700 transition-all duration-200 w-full text-left"
-                >
-                  <LogOut size={20} />
-                  <span>Sign Out</span>
-                </button>
-              )}
-            </nav>
-          </div>
+                {user &&
+                  userRole === "department" &&
+                  departmentLinks.map(({ path, label, icon: Icon }) => (
+                    <Link
+                      key={path}
+                      to={path}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                        isActive(path)
+                          ? "bg-gold-500 text-maroon-800 font-semibold"
+                          : "hover:bg-maroon-700 text-white"
+                      }`}
+                    >
+                      <Icon size={20} />
+                      <span>{label}</span>
+                    </Link>
+                  ))}
+
+                {user && (
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      handleSignOut();
+                    }}
+                    className="flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-maroon-700 transition-all duration-200 w-full text-left"
+                  >
+                    <LogOut size={20} />
+                    <span>Sign Out</span>
+                  </button>
+                )}
+              </nav>
+            </div>
+          </>
         )}
       </header>
 
