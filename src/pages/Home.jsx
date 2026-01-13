@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { sendTicketConfirmationEmail } from "../lib/resend";
 import {
   FileText,
   Search,
@@ -403,13 +404,12 @@ const Home = () => {
 
                 {/* Complaint textarea */}
                 <div
-                  className={`backdrop-blur-sm border-2 rounded-2xl p-4 mb-4 transition-all duration-300 ${
-                    fieldErrors.complaint
-                      ? "bg-red-500/20 border-red-400 animate-shake"
-                      : isFocused
+                  className={`backdrop-blur-sm border-2 rounded-2xl p-4 mb-4 transition-all duration-300 ${fieldErrors.complaint
+                    ? "bg-red-500/20 border-red-400 animate-shake"
+                    : isFocused
                       ? "bg-white/20 border-gold-400 shadow-lg shadow-gold-500/20"
                       : "bg-white/10 border-white/30"
-                  }`}
+                    }`}
                 >
                   <textarea
                     value={complaint}
@@ -462,13 +462,12 @@ const Home = () => {
                             category: false,
                           }));
                         }}
-                        className={`bg-white/10 border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-400 transition-all ${
-                          fieldErrors.category
-                            ? "border-red-400 bg-red-500/20 animate-shake"
-                            : showCategoryReminder
+                        className={`bg-white/10 border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-400 transition-all ${fieldErrors.category
+                          ? "border-red-400 bg-red-500/20 animate-shake"
+                          : showCategoryReminder
                             ? "border-gold-400 animate-pulse"
                             : "border-white/30"
-                        }`}
+                          }`}
                       >
                         <option value="" className="text-gray-900">
                           Category
@@ -506,13 +505,12 @@ const Home = () => {
                     <button
                       type="submit"
                       disabled={loading}
-                      className={`p-3 rounded-xl transition-all duration-200 flex-shrink-0 ${
-                        loading
-                          ? "opacity-50 cursor-not-allowed"
-                          : complaint.trim() && category
+                      className={`p-3 rounded-xl transition-all duration-200 flex-shrink-0 ${loading
+                        ? "opacity-50 cursor-not-allowed"
+                        : complaint.trim() && category
                           ? "bg-gold-400 text-maroon-900 hover:bg-gold-300 hover:scale-110 active:scale-95 shadow-lg shadow-gold-500/30"
                           : "bg-gold-500/70 text-maroon-900 hover:bg-gold-400 hover:scale-110 active:scale-95"
-                      }`}
+                        }`}
                     >
                       {loading ? (
                         <Loader2 size={20} className="animate-spin" />
@@ -733,6 +731,15 @@ const Home = () => {
                             })
                             .eq("reference_number", referenceNumber);
                           if (!updateError) {
+                            // Send confirmation email if email was provided
+                            if (personalDetails.email) {
+                              await sendTicketConfirmationEmail({
+                                to: personalDetails.email,
+                                referenceNumber: referenceNumber,
+                                category: category,
+                                description: complaint,
+                              });
+                            }
                             setShowPersonalDetails(false);
                             setDetailsSuccess(true);
                             setTimeout(() => setDetailsSuccess(false), 3000);
