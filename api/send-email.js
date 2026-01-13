@@ -1,19 +1,8 @@
 // Vercel Serverless Function to send emails via Nodemailer + Resend SMTP
 
-const nodemailer = require("nodemailer");
+import nodemailer from "nodemailer";
 
-// Create transporter using Resend SMTP
-const transporter = nodemailer.createTransport({
-    host: "smtp.resend.com",
-    port: 465,
-    secure: true,
-    auth: {
-        user: "resend",
-        pass: process.env.RESEND_API_KEY,
-    },
-});
-
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
     // Set CORS headers
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -31,7 +20,7 @@ module.exports = async function handler(req, res) {
 
     if (!process.env.RESEND_API_KEY) {
         console.error("RESEND_API_KEY not configured");
-        return res.status(500).json({ error: "Email service not configured" });
+        return res.status(500).json({ error: "Email service not configured. RESEND_API_KEY is missing." });
     }
 
     try {
@@ -40,6 +29,17 @@ module.exports = async function handler(req, res) {
         if (!to || !subject || !html) {
             return res.status(400).json({ error: "Missing required fields: to, subject, html" });
         }
+
+        // Create transporter inside handler to ensure env vars are available
+        const transporter = nodemailer.createTransport({
+            host: "smtp.resend.com",
+            port: 465,
+            secure: true,
+            auth: {
+                user: "resend",
+                pass: process.env.RESEND_API_KEY,
+            },
+        });
 
         const info = await transporter.sendMail({
             from: "Liceo 8888 <noreply@citattendance.info>",
