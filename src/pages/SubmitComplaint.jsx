@@ -146,19 +146,32 @@ const SubmitComplaint = () => {
         }
       }
 
-      const { error: insertError } = await supabase.from("complaints").insert({
-        reference_number: refNumber,
-        name: formData.isAnonymous ? "Anonymous" : formData.name,
-        email: formData.email,
-        student_id: formData.studentId,
-        category: formData.category,
-        description: formData.description,
-        is_anonymous: formData.isAnonymous,
-        attachment_url: attachmentUrl,
-        status: "submitted",
-      });
+      const { data: insertedComplaint, error: insertError } = await supabase
+        .from("complaints")
+        .insert({
+          reference_number: refNumber,
+          name: formData.isAnonymous ? "Anonymous" : formData.name,
+          email: formData.email,
+          student_id: formData.studentId,
+          category: formData.category,
+          description: formData.description,
+          is_anonymous: formData.isAnonymous,
+          attachment_url: attachmentUrl,
+          status: "submitted",
+        })
+        .select()
+        .single();
 
       if (insertError) throw insertError;
+
+      // Create initial audit trail entry
+      if (insertedComplaint) {
+        await supabase.from("audit_trail").insert({
+          complaint_id: insertedComplaint.id,
+          action: "Complaint Submitted",
+          details: `New ${formData.category} complaint submitted${formData.isAnonymous ? " anonymously" : ` by ${formData.name}`}`,
+        });
+      }
 
       setReferenceNumber(refNumber);
       setSuccess(true);

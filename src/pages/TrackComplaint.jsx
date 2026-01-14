@@ -13,8 +13,13 @@ import {
   Building2,
   MessageSquare,
   Loader2,
+  ThumbsUp,
+  ThumbsDown,
+  Lock,
+  Timer,
   Send,
-  Info,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 const TrackComplaint = () => {
@@ -24,9 +29,12 @@ const TrackComplaint = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
-  const [additionalInfo, setAdditionalInfo] = useState("");
-  const [sendingInfo, setSendingInfo] = useState(false);
-  const [infoSuccess, setInfoSuccess] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
+  const [showDisputeForm, setShowDisputeForm] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+  const [commentLoading, setCommentLoading] = useState(false);
 
   const statusConfig = {
     submitted: {
@@ -61,7 +69,21 @@ const TrackComplaint = () => {
       color: "bg-green-100 text-green-800 border-green-200",
       icon: CheckCircle,
       description:
-        "Your complaint has been resolved. Thank you for your feedback.",
+        "Your complaint has been resolved. Please verify if the issue was properly addressed.",
+    },
+    closed: {
+      label: "Closed",
+      color: "bg-gray-100 text-gray-800 border-gray-200",
+      icon: Lock,
+      description:
+        "This complaint has been closed. Thank you for your feedback.",
+    },
+    disputed: {
+      label: "Disputed",
+      color: "bg-amber-100 text-amber-800 border-amber-200",
+      icon: AlertCircle,
+      description:
+        "You have disputed the resolution. The admin will review your concern.",
     },
   };
 
@@ -72,8 +94,6 @@ const TrackComplaint = () => {
     setAuditTrail([]);
     setLoading(true);
     setSearched(true);
-    setAdditionalInfo("");
-    setInfoSuccess(false);
 
     try {
       const { data, error: fetchError } = await supabase
@@ -103,6 +123,18 @@ const TrackComplaint = () => {
       if (trailData) {
         setAuditTrail(trailData);
       }
+
+      // Fetch comments (only non-internal ones for complainants)
+      const { data: commentsData } = await supabase
+        .from("ticket_comments")
+        .select("*")
+        .eq("complaint_id", data.id)
+        .eq("is_internal", false)
+        .order("created_at", { ascending: true });
+
+      if (commentsData) {
+        setComments(commentsData);
+      }
     } catch (err) {
       setError(err.message || "Failed to fetch complaint. Please try again.");
     } finally {
@@ -110,31 +142,157 @@ const TrackComplaint = () => {
     }
   };
 
-  const handleSendAdditionalInfo = async () => {
-    if (!additionalInfo.trim()) {
-      setError("Please enter additional information before sending");
-      return;
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getRemainingDays = (resolvedAt) => {
+    if (!resolvedAt) return 0;
+    const resolvedDate = new Date(resolvedAt);
+    const expiryDate = new Date(resolvedDate.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const remainingMs = expiryDate - now;
+    const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+    return Math.max(0, remainingDays);
+  };
+
+  const isWithinVerificationWindow = (resolvedAt) => {
+    return getRemainingDays(resolvedAt) > 0;
+  };
+
+  const fetchComments = async (complaintId) => {
+    const { data: commentsData } = await supabase
+      .from("ticket_comments")
+      .select("*")
+      .eq("complaint_id", complaintId)
+      .eq("is_internal", false)
+      .order("created_at", { ascending: true });
+
+    if (commentsData) {
+      setComments(commentsData);
     }
+  };
 
-    setSendingInfo(true);
-    setError("");
+  const handlePostComment = async () => {
+    if (!newComment.trim() || !complaint) return;
 
+    setCommentLoading(true);
     try {
-      const updatedDescription = `${complaint.description}\n\n--- Additional Information ---\n${additionalInfo}`;
+      const { error: insertError } = await supabase
+        .from("ticket_comments")
+        .insert({
+          complaint_id: complaint.id,
+          content: newComment.trim(),
+          author_name: complaint.name || "Anonymous",
+          author_type: "complainant",
+          is_internal: false,
+        });
 
+      if (insertError) throw insertError;
+
+      setNewComment("");
+      await fetchComments(complaint.id);
+    } catch (err) {
+      setError(err.message || "Failed to post comment");
+    } finally {
+      setCommentLoading(false);
+    }
+  };
+
+  const formatCommentDate = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  const handleConfirmResolution = async () => {
+    setActionLoading(true);
+    try {
       const { error: updateError } = await supabase
         .from("complaints")
-        .update({ description: updatedDescription })
+        .update({
+          status: "closed",
+          closed_at: new Date().toISOString(),
+          user_verified: true,
+        })
         .eq("id", complaint.id);
 
       if (updateError) throw updateError;
 
       await supabase.from("audit_trail").insert({
         complaint_id: complaint.id,
-        action: "Additional Information Provided",
-        details: additionalInfo,
+        action: "Resolution Confirmed by User",
+        details: "The complainant confirmed that the issue was resolved satisfactorily.",
       });
 
+      // Refresh complaint data
+      const { data: updatedComplaint } = await supabase
+        .from("complaints")
+        .select("*")
+        .eq("id", complaint.id)
+        .single();
+
+      if (updatedComplaint) {
+        setComplaint(updatedComplaint);
+      }
+
+      const { data: trailData } = await supabase
+        .from("audit_trail")
+        .select("*")
+        .eq("complaint_id", complaint.id)
+        .order("created_at", { ascending: true });
+
+      if (trailData) {
+        setAuditTrail(trailData);
+      }
+    } catch (err) {
+      setError(err.message || "Failed to confirm resolution");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDisputeResolution = async () => {
+    if (!disputeReason.trim()) {
+      setError("Please provide a reason for disputing the resolution");
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const { error: updateError } = await supabase
+        .from("complaints")
+        .update({
+          status: "disputed",
+          dispute_reason: disputeReason,
+          disputed_at: new Date().toISOString(),
+        })
+        .eq("id", complaint.id);
+
+      if (updateError) throw updateError;
+
+      await supabase.from("audit_trail").insert({
+        complaint_id: complaint.id,
+        action: "Resolution Disputed by User",
+        details: `Reason: ${disputeReason}`,
+      });
+
+      // Refresh complaint data
       const { data: updatedComplaint } = await supabase
         .from("complaints")
         .select("*")
@@ -155,24 +313,13 @@ const TrackComplaint = () => {
         setAuditTrail(trailData);
       }
 
-      setAdditionalInfo("");
-      setInfoSuccess(true);
-      setTimeout(() => setInfoSuccess(false), 3000);
+      setDisputeReason("");
+      setShowDisputeForm(false);
     } catch (err) {
-      setError(err.message || "Failed to send additional information");
+      setError(err.message || "Failed to dispute resolution");
     } finally {
-      setSendingInfo(false);
+      setActionLoading(false);
     }
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
   const StatusBadge = ({ status }) => {
@@ -190,7 +337,7 @@ const TrackComplaint = () => {
 
   return (
     <div className="min-h-[calc(100vh-200px)] py-12 px-4 sm:px-6 lg:px-8 bg-gray-50">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-maroon-800 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -253,7 +400,9 @@ const TrackComplaint = () => {
 
         {/* Complaint Details */}
         {complaint && (
-          <div className="space-y-6">
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Main Content */}
+            <div className="flex-1 space-y-6">
             {/* Status Card */}
             <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -369,54 +518,106 @@ const TrackComplaint = () => {
               )}
             </div>
 
-            {/* Send Additional Information */}
-            {complaint.status !== "resolved" &&
-              complaint.status !== "rejected" && (
-                <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
-                  <div className="flex items-center space-x-2 mb-4">
-                    <Info size={20} className="text-maroon-800" />
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Send Additional Information
-                    </h3>
-                  </div>
+{/* Verification Actions - Show when resolved and within 7 days */}
+            {complaint.status === "resolved" && isWithinVerificationWindow(complaint.resolved_at) && (
+              <div className="bg-white rounded-2xl shadow-xl p-6 border border-green-200">
+                <div className="flex items-center space-x-2 mb-4">
+                  <Timer size={20} className="text-green-600" />
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Verify Resolution
+                  </h3>
+                  <span className="ml-auto text-sm text-orange-600 font-medium bg-orange-50 px-3 py-1 rounded-full">
+                    {getRemainingDays(complaint.resolved_at)} day{getRemainingDays(complaint.resolved_at) !== 1 ? 's' : ''} remaining
+                  </span>
+                </div>
 
-                  {infoSuccess && (
-                    <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl flex items-start space-x-2">
-                      <CheckCircle
-                        size={18}
-                        className="text-green-500 flex-shrink-0 mt-0.5"
-                      />
-                      <p className="text-green-700 text-sm">
-                        Additional information sent successfully!
-                      </p>
-                    </div>
-                  )}
+                <p className="text-gray-600 mb-4">
+                  Please confirm if your issue has been resolved satisfactorily, or dispute if you believe the problem was not properly addressed. 
+                  If no action is taken within 7 days, the ticket will be automatically closed.
+                </p>
 
-                  <div className="space-y-3">
-                    <textarea
-                      value={additionalInfo}
-                      onChange={(e) => setAdditionalInfo(e.target.value)}
-                      rows={4}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 outline-none resize-none"
-                      placeholder="Provide any additional details or updates about your complaint..."
-                    />
+                {!showDisputeForm ? (
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <button
-                      onClick={handleSendAdditionalInfo}
-                      disabled={sendingInfo || !additionalInfo.trim()}
-                      className="w-full bg-maroon-800 text-white py-3 px-4 rounded-xl font-semibold hover:bg-maroon-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={handleConfirmResolution}
+                      disabled={actionLoading}
+                      className="flex-1 bg-green-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
                     >
-                      {sendingInfo ? (
+                      {actionLoading ? (
                         <Loader2 size={20} className="animate-spin" />
                       ) : (
                         <>
-                          <Send size={20} />
-                          <span>Send Additional Information</span>
+                          <ThumbsUp size={20} />
+                          <span>Confirm Resolution</span>
                         </>
                       )}
                     </button>
+                    <button
+                      onClick={() => setShowDisputeForm(true)}
+                      disabled={actionLoading}
+                      className="flex-1 bg-amber-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-amber-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
+                    >
+                      <ThumbsDown size={20} />
+                      <span>Dispute Resolution</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Why are you disputing this resolution? <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={disputeReason}
+                        onChange={(e) => setDisputeReason(e.target.value)}
+                        rows={4}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none"
+                        placeholder="Please explain why you believe the issue was not properly resolved..."
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleDisputeResolution}
+                        disabled={actionLoading || !disputeReason.trim()}
+                        className="flex-1 bg-amber-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-amber-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
+                      >
+                        {actionLoading ? (
+                          <Loader2 size={20} className="animate-spin" />
+                        ) : (
+                          <>
+                            <ThumbsDown size={20} />
+                            <span>Submit Dispute</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowDisputeForm(false);
+                          setDisputeReason("");
+                        }}
+                        disabled={actionLoading}
+                        className="px-6 py-3 border border-gray-300 rounded-xl font-semibold hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Show dispute reason if disputed */}
+            {complaint.status === "disputed" && complaint.dispute_reason && (
+              <div className="bg-amber-50 rounded-2xl shadow-xl p-6 border border-amber-200">
+                <div className="flex items-start space-x-3">
+                  <AlertCircle size={20} className="text-amber-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm text-amber-700 mb-1 font-medium">Your Dispute Reason</p>
+                    <p className="text-amber-900 whitespace-pre-wrap">{complaint.dispute_reason}</p>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
             {/* Audit Trail */}
             {auditTrail.length > 0 && (
@@ -457,6 +658,100 @@ const TrackComplaint = () => {
                 </div>
               </div>
             )}
+            </div>
+
+            {/* Discussion Section - Right side on desktop, bottom on mobile */}
+            <div className="lg:w-96 lg:flex-shrink-0">
+              <div className="bg-white rounded-2xl shadow-xl border border-gray-100 sticky top-4">
+                <div className="p-4 border-b border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 flex items-center space-x-2">
+                    <MessageSquare size={20} className="text-maroon-800" />
+                    <span>Discussion</span>
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Communicate about this ticket
+                  </p>
+                </div>
+
+                {/* Comments List */}
+                <div className="h-80 overflow-y-auto p-4 space-y-4">
+                  {comments.length === 0 ? (
+                    <div className="text-center py-8">
+                      <MessageSquare size={32} className="mx-auto text-gray-300 mb-2" />
+                      <p className="text-gray-500 text-sm">No comments yet</p>
+                      <p className="text-gray-400 text-xs">Start the conversation</p>
+                    </div>
+                  ) : (
+                    comments.map((comment) => (
+                      <div key={comment.id} className="flex space-x-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          comment.author_type === 'admin' 
+                            ? 'bg-maroon-100 text-maroon-800' 
+                            : comment.author_type === 'department'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          <User size={14} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium text-gray-900 text-sm truncate">
+                              {comment.author_name}
+                            </span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${
+                              comment.author_type === 'admin' 
+                                ? 'bg-maroon-100 text-maroon-700' 
+                                : comment.author_type === 'department'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {comment.author_type === 'complainant' ? 'You' : comment.author_type}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {formatCommentDate(comment.created_at)}
+                            </span>
+                          </div>
+                          <p className="text-gray-700 text-sm mt-1 break-words">
+                            {comment.content}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Comment Input */}
+                <div className="p-4 border-t border-gray-100">
+                  <div className="flex space-x-2">
+                    <textarea
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Write a comment..."
+                      rows={2}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 outline-none resize-none text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handlePostComment();
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={handlePostComment}
+                      disabled={commentLoading || !newComment.trim()}
+                      className="px-4 py-2 bg-maroon-800 text-white rounded-xl hover:bg-maroon-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                    >
+                      {commentLoading ? (
+                        <Loader2 size={18} className="animate-spin" />
+                      ) : (
+                        <Send size={18} />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">Press Enter to send</p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

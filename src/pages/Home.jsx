@@ -188,22 +188,115 @@ const Home = () => {
   const checkIPRateLimit = async (ipAddress) => {
     if (!ipAddress) return { allowed: true };
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    try {
+      // First check if IP is blocked
+      const { data: blockedData } = await supabase
+        .from("blocked_ips")
+        .select("id")
+        .eq("ip_address", ipAddress)
+        .or("expires_at.is.null,expires_at.gt.now()")
+        .limit(1);
 
-    const { data, error } = await supabase
-      .from("complaint_submissions")
-      .select("id")
-      .eq("ip_address", ipAddress)
-      .gte("created_at", today.toISOString())
-      .limit(1);
+      if (blockedData && blockedData.length > 0) {
+        return { 
+          allowed: false, 
+          reason: "Your IP address has been blocked from submitting complaints." 
+        };
+      }
 
-    if (error) {
-      console.error("Rate limit check error:", error);
+      // Fetch rate limits configuration
+      const { data: limitsData } = await supabase
+        .from("rate_limits")
+        .select("*")
+        .eq("id", 1)
+        .single();
+
+      const limits = limitsData || {
+        daily_limit: 5,
+        weekly_limit: 15,
+        monthly_limit: 30,
+        yearly_limit: 100,
+        cooldown_minutes: 30,
+        enabled: true,
+      };
+
+      // If rate limiting is disabled, allow
+      if (!limits.enabled) {
+        return { allowed: true };
+      }
+
+      // Get submission counts for each period
+      const now = new Date();
+      const dayAgo = new Date(now - 24 * 60 * 60 * 1000);
+      const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+      const monthAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+      const yearAgo = new Date(now - 365 * 24 * 60 * 60 * 1000);
+
+      // Get all submissions for this IP in the past year
+      const { data: submissions, error } = await supabase
+        .from("complaint_submissions")
+        .select("created_at")
+        .eq("ip_address", ipAddress)
+        .gte("created_at", yearAgo.toISOString())
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Rate limit check error:", error);
+        return { allowed: true };
+      }
+
+      const submissionDates = (submissions || []).map(s => new Date(s.created_at));
+      
+      // Check cooldown period
+      if (submissionDates.length > 0 && limits.cooldown_minutes > 0) {
+        const lastSubmission = submissionDates[0];
+        const cooldownEnd = new Date(lastSubmission.getTime() + limits.cooldown_minutes * 60 * 1000);
+        if (now < cooldownEnd) {
+          const minutesLeft = Math.ceil((cooldownEnd - now) / (60 * 1000));
+          return { 
+            allowed: false, 
+            reason: `Please wait ${minutesLeft} minute${minutesLeft > 1 ? 's' : ''} before submitting another complaint.` 
+          };
+        }
+      }
+
+      // Count submissions per period
+      const dailyCount = submissionDates.filter(d => d > dayAgo).length;
+      const weeklyCount = submissionDates.filter(d => d > weekAgo).length;
+      const monthlyCount = submissionDates.filter(d => d > monthAgo).length;
+      const yearlyCount = submissionDates.length;
+
+      // Check limits
+      if (dailyCount >= limits.daily_limit) {
+        return { 
+          allowed: false, 
+          reason: `You have reached the daily limit of ${limits.daily_limit} submissions. Please try again tomorrow.` 
+        };
+      }
+      if (weeklyCount >= limits.weekly_limit) {
+        return { 
+          allowed: false, 
+          reason: `You have reached the weekly limit of ${limits.weekly_limit} submissions. Please try again next week.` 
+        };
+      }
+      if (monthlyCount >= limits.monthly_limit) {
+        return { 
+          allowed: false, 
+          reason: `You have reached the monthly limit of ${limits.monthly_limit} submissions. Please try again next month.` 
+        };
+      }
+      if (yearlyCount >= limits.yearly_limit) {
+        return { 
+          allowed: false, 
+          reason: `You have reached the yearly limit of ${limits.yearly_limit} submissions.` 
+        };
+      }
+
+      return { allowed: true };
+    } catch (err) {
+      console.error("Rate limit check error:", err);
       return { allowed: true };
     }
-
-    return { allowed: data.length === 0 };
   };
 
   const recordSubmission = async (ipAddress, complaintId) => {
@@ -249,12 +342,10 @@ const Home = () => {
 
     try {
       const ipAddress = await getClientIP();
-      const { allowed } = await checkIPRateLimit(ipAddress);
+      const { allowed, reason } = await checkIPRateLimit(ipAddress);
 
       if (!allowed) {
-        setError(
-          "You have already submitted a complaint today. Please try again tomorrow."
-        );
+        setError(reason || "You have reached the submission limit. Please try again later.");
         setLoading(false);
         return;
       }
