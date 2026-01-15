@@ -15,6 +15,30 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Complaint comments/chat table
+CREATE TABLE IF NOT EXISTS complaint_comments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  complaint_id UUID NOT NULL REFERENCES complaints(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id),
+  user_name TEXT NOT NULL,
+  user_role TEXT NOT NULL CHECK (user_role IN ('student', 'admin', 'department')),
+  comment_text TEXT NOT NULL,
+  is_internal BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Departments table for dynamic category management
+CREATE TABLE IF NOT EXISTS departments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  code TEXT UNIQUE NOT NULL,
+  description TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Complaints table
 CREATE TABLE IF NOT EXISTS complaints (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -52,12 +76,26 @@ CREATE TABLE IF NOT EXISTS audit_trail (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Insert default departments
+INSERT INTO departments (name, code, description, is_active) VALUES
+  ('Academic Affairs', 'academic', 'Academic-related concerns and issues', true),
+  ('Facilities Management', 'facilities', 'Building, equipment, and facility concerns', true),
+  ('Finance Office', 'finance', 'Financial and payment-related matters', true),
+  ('Staff Relations', 'staff', 'Staff behavior and conduct issues', true),
+  ('Security Office', 'security', 'Safety and security concerns', true),
+  ('Other', 'other', 'General concerns not covered by other categories', true)
+ON CONFLICT (code) DO NOTHING;
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_complaints_reference ON complaints(reference_number);
 CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status);
 CREATE INDEX IF NOT EXISTS idx_complaints_department ON complaints(assigned_department);
 CREATE INDEX IF NOT EXISTS idx_complaints_created ON complaints(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_complaint ON audit_trail(complaint_id);
+CREATE INDEX IF NOT EXISTS idx_comments_complaint ON complaint_comments(complaint_id);
+CREATE INDEX IF NOT EXISTS idx_comments_created ON complaint_comments(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_departments_code ON departments(code);
+CREATE INDEX IF NOT EXISTS idx_departments_active ON departments(is_active);
 
 -- Sample admin user (run this after creating the user in Supabase Auth)
 -- Replace 'YOUR_ADMIN_USER_ID' with the actual UUID from auth.users

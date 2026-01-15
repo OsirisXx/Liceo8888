@@ -45,6 +45,8 @@ const Home = () => {
   });
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailsSuccess, setDetailsSuccess] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
 
   const placeholderTexts = [
     "Share your concern with us - we're here to help...",
@@ -102,14 +104,33 @@ const Home = () => {
     };
   }, [placeholderIndex, isTyping]);
 
-  const categories = [
-    { value: "academic", label: "Academic" },
-    { value: "facilities", label: "Facilities" },
-    { value: "finance", label: "Finance" },
-    { value: "staff", label: "Staff" },
-    { value: "security", label: "Security" },
-    { value: "other", label: "Other" },
-  ];
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("departments")
+          .select("code, name")
+          .eq("is_active", true)
+          .order("name", { ascending: true });
+
+        if (error) throw error;
+
+        const formattedCategories = (data || []).map((dept) => ({
+          value: dept.code,
+          label: dept.name,
+        }));
+
+        setCategories(formattedCategories);
+      } catch (err) {
+        console.error("Error fetching categories:", err);
+        setCategories([]);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   const generateReferenceNumber = () => {
     const timestamp = Date.now().toString(36).toUpperCase();
@@ -198,9 +219,10 @@ const Home = () => {
         .limit(1);
 
       if (blockedData && blockedData.length > 0) {
-        return { 
-          allowed: false, 
-          reason: "Your IP address has been blocked from submitting complaints." 
+        return {
+          allowed: false,
+          reason:
+            "Your IP address has been blocked from submitting complaints.",
         };
       }
 
@@ -245,50 +267,56 @@ const Home = () => {
         return { allowed: true };
       }
 
-      const submissionDates = (submissions || []).map(s => new Date(s.created_at));
-      
+      const submissionDates = (submissions || []).map(
+        (s) => new Date(s.created_at)
+      );
+
       // Check cooldown period
       if (submissionDates.length > 0 && limits.cooldown_minutes > 0) {
         const lastSubmission = submissionDates[0];
-        const cooldownEnd = new Date(lastSubmission.getTime() + limits.cooldown_minutes * 60 * 1000);
+        const cooldownEnd = new Date(
+          lastSubmission.getTime() + limits.cooldown_minutes * 60 * 1000
+        );
         if (now < cooldownEnd) {
           const minutesLeft = Math.ceil((cooldownEnd - now) / (60 * 1000));
-          return { 
-            allowed: false, 
-            reason: `Please wait ${minutesLeft} minute${minutesLeft > 1 ? 's' : ''} before submitting another complaint.` 
+          return {
+            allowed: false,
+            reason: `Please wait ${minutesLeft} minute${
+              minutesLeft > 1 ? "s" : ""
+            } before submitting another complaint.`,
           };
         }
       }
 
       // Count submissions per period
-      const dailyCount = submissionDates.filter(d => d > dayAgo).length;
-      const weeklyCount = submissionDates.filter(d => d > weekAgo).length;
-      const monthlyCount = submissionDates.filter(d => d > monthAgo).length;
+      const dailyCount = submissionDates.filter((d) => d > dayAgo).length;
+      const weeklyCount = submissionDates.filter((d) => d > weekAgo).length;
+      const monthlyCount = submissionDates.filter((d) => d > monthAgo).length;
       const yearlyCount = submissionDates.length;
 
       // Check limits
       if (dailyCount >= limits.daily_limit) {
-        return { 
-          allowed: false, 
-          reason: `You have reached the daily limit of ${limits.daily_limit} submissions. Please try again tomorrow.` 
+        return {
+          allowed: false,
+          reason: `You have reached the daily limit of ${limits.daily_limit} submissions. Please try again tomorrow.`,
         };
       }
       if (weeklyCount >= limits.weekly_limit) {
-        return { 
-          allowed: false, 
-          reason: `You have reached the weekly limit of ${limits.weekly_limit} submissions. Please try again next week.` 
+        return {
+          allowed: false,
+          reason: `You have reached the weekly limit of ${limits.weekly_limit} submissions. Please try again next week.`,
         };
       }
       if (monthlyCount >= limits.monthly_limit) {
-        return { 
-          allowed: false, 
-          reason: `You have reached the monthly limit of ${limits.monthly_limit} submissions. Please try again next month.` 
+        return {
+          allowed: false,
+          reason: `You have reached the monthly limit of ${limits.monthly_limit} submissions. Please try again next month.`,
         };
       }
       if (yearlyCount >= limits.yearly_limit) {
-        return { 
-          allowed: false, 
-          reason: `You have reached the yearly limit of ${limits.yearly_limit} submissions.` 
+        return {
+          allowed: false,
+          reason: `You have reached the yearly limit of ${limits.yearly_limit} submissions.`,
         };
       }
 
@@ -345,7 +373,10 @@ const Home = () => {
       const { allowed, reason } = await checkIPRateLimit(ipAddress);
 
       if (!allowed) {
-        setError(reason || "You have reached the submission limit. Please try again later.");
+        setError(
+          reason ||
+            "You have reached the submission limit. Please try again later."
+        );
         setLoading(false);
         return;
       }
@@ -495,12 +526,13 @@ const Home = () => {
 
                 {/* Complaint textarea */}
                 <div
-                  className={`backdrop-blur-sm border-2 rounded-2xl p-4 mb-4 transition-all duration-300 ${fieldErrors.complaint
-                    ? "bg-red-500/20 border-red-400 animate-shake"
-                    : isFocused
+                  className={`backdrop-blur-sm border-2 rounded-2xl p-4 mb-4 transition-all duration-300 ${
+                    fieldErrors.complaint
+                      ? "bg-red-500/20 border-red-400 animate-shake"
+                      : isFocused
                       ? "bg-white/20 border-gold-400 shadow-lg shadow-gold-500/20"
                       : "bg-white/10 border-white/30"
-                    }`}
+                  }`}
                 >
                   <textarea
                     value={complaint}
@@ -553,15 +585,21 @@ const Home = () => {
                             category: false,
                           }));
                         }}
-                        className={`bg-white/10 border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-400 transition-all ${fieldErrors.category
-                          ? "border-red-400 bg-red-500/20 animate-shake"
-                          : showCategoryReminder
+                        disabled={categoriesLoading || categories.length === 0}
+                        className={`bg-white/10 border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                          fieldErrors.category
+                            ? "border-red-400 bg-red-500/20 animate-shake"
+                            : showCategoryReminder
                             ? "border-gold-400 animate-pulse"
                             : "border-white/30"
-                          }`}
+                        }`}
                       >
                         <option value="" className="text-gray-900">
-                          Category
+                          {categoriesLoading
+                            ? "Loading categories..."
+                            : categories.length === 0
+                            ? "No categories available"
+                            : "Select Category"}
                         </option>
                         {categories.map((cat) => (
                           <option
@@ -596,12 +634,13 @@ const Home = () => {
                     <button
                       type="submit"
                       disabled={loading}
-                      className={`p-3 rounded-xl transition-all duration-200 flex-shrink-0 ${loading
-                        ? "opacity-50 cursor-not-allowed"
-                        : complaint.trim() && category
+                      className={`p-3 rounded-xl transition-all duration-200 flex-shrink-0 ${
+                        loading
+                          ? "opacity-50 cursor-not-allowed"
+                          : complaint.trim() && category
                           ? "bg-gold-400 text-maroon-900 hover:bg-gold-300 hover:scale-110 active:scale-95 shadow-lg shadow-gold-500/30"
                           : "bg-gold-500/70 text-maroon-900 hover:bg-gold-400 hover:scale-110 active:scale-95"
-                        }`}
+                      }`}
                     >
                       {loading ? (
                         <Loader2 size={20} className="animate-spin" />
