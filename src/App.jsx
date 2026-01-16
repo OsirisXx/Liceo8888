@@ -3,7 +3,6 @@ import { AuthProvider } from "./contexts/AuthContext";
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Home from "./pages/Home";
-import SubmitComplaint from "./pages/SubmitComplaint";
 import TrackComplaint from "./pages/TrackComplaint";
 import AdminDashboard from "./pages/AdminDashboard";
 import DepartmentDashboard from "./pages/DepartmentDashboard";
@@ -22,7 +21,7 @@ function App() {
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/student-login" element={<StudentLogin />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="/submit" element={<SubmitComplaint />} />
+            <Route path="/submit" element={<Navigate to="/" replace />} />
             <Route path="/track" element={<TrackComplaint />} />
             <Route path="/ticket/:referenceNumber" element={<TrackComplaint />} />
             <Route
