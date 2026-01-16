@@ -594,8 +594,8 @@ const Home = () => {
                   )}
 
                   {/* Action buttons row */}
-                  <div className="flex flex-row items-center gap-2 sm:gap-3 mt-3 pt-3 border-t border-white/20">
-                    <div className="flex items-center gap-2 flex-1">
+                  <div className="flex flex-row items-center gap-2 sm:gap-3 mt-3 pt-3 border-t border-white/20 overflow-hidden">
+                    <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
                       {/* Category selector - moved to left of images */}
                       <select
                         value={category}
@@ -609,7 +609,8 @@ const Home = () => {
                           }));
                         }}
                         disabled={categoriesLoading || categories.length === 0}
-                        className={`bg-white/10 border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gold-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                        style={{ width: '140px', maxWidth: '140px' }}
+                        className={`flex-shrink-0 bg-white/10 border rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-gold-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
                           fieldErrors.category
                             ? "border-red-400 bg-red-500/20 animate-shake"
                             : showCategoryReminder
