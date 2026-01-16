@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import {
   Search,
@@ -23,6 +24,10 @@ import {
 } from "lucide-react";
 
 const TrackComplaint = () => {
+  const { referenceNumber: urlRefNumber } = useParams();
+  const [searchParams] = useSearchParams();
+  const queryRefNumber = searchParams.get("ref");
+  
   const [referenceNumber, setReferenceNumber] = useState("");
   const [complaint, setComplaint] = useState(null);
   const [auditTrail, setAuditTrail] = useState([]);
@@ -35,6 +40,15 @@ const TrackComplaint = () => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
+
+  // Auto-load ticket from URL parameter or query string
+  useEffect(() => {
+    const refToLoad = urlRefNumber || queryRefNumber;
+    if (refToLoad && !complaint) {
+      setReferenceNumber(refToLoad);
+      handleSearchWithRef(refToLoad);
+    }
+  }, [urlRefNumber, queryRefNumber]);
 
   const statusConfig = {
     submitted: {
@@ -85,6 +99,61 @@ const TrackComplaint = () => {
       description:
         "You have disputed the resolution. The admin will review your concern.",
     },
+  };
+
+  // Search with a provided reference number (for URL parameter loading)
+  const handleSearchWithRef = async (ref) => {
+    setError("");
+    setComplaint(null);
+    setAuditTrail([]);
+    setLoading(true);
+    setSearched(true);
+
+    try {
+      const { data, error: fetchError } = await supabase
+        .from("complaints")
+        .select("*")
+        .eq("reference_number", ref.toUpperCase())
+        .single();
+
+      if (fetchError) {
+        if (fetchError.code === "PGRST116") {
+          setError("No complaint found with this reference number.");
+        } else {
+          throw fetchError;
+        }
+        setLoading(false);
+        return;
+      }
+
+      setComplaint(data);
+
+      const { data: trailData } = await supabase
+        .from("audit_trail")
+        .select("*")
+        .eq("complaint_id", data.id)
+        .order("created_at", { ascending: true });
+
+      if (trailData) {
+        setAuditTrail(trailData);
+      }
+
+      // Fetch comments (only non-internal ones for complainants)
+      const { data: commentsData } = await supabase
+        .from("ticket_comments")
+        .select("*")
+        .eq("complaint_id", data.id)
+        .eq("is_internal", false)
+        .order("created_at", { ascending: true });
+
+      if (commentsData) {
+        setComments(commentsData);
+      }
+    } catch (err) {
+      setError(err.message || "Failed to fetch complaint. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSearch = async (e) => {

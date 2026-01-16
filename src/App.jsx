@@ -8,6 +8,9 @@ import TrackComplaint from "./pages/TrackComplaint";
 import AdminDashboard from "./pages/AdminDashboard";
 import DepartmentDashboard from "./pages/DepartmentDashboard";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+import StudentLogin from "./pages/StudentLogin";
+import AuthCallback from "./pages/AuthCallback";
+import MyTickets from "./pages/MyTickets";
 
 function App() {
   return (
@@ -17,8 +20,19 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
+            <Route path="/student-login" element={<StudentLogin />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/submit" element={<SubmitComplaint />} />
             <Route path="/track" element={<TrackComplaint />} />
+            <Route path="/ticket/:referenceNumber" element={<TrackComplaint />} />
+            <Route
+              path="/my-tickets"
+              element={
+                <ProtectedRoute allowedRoles={["student"]}>
+                  <MyTickets />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/admin"
               element={

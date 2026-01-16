@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { sendTicketConfirmationEmail } from "../lib/resend";
+import { useAuth } from "../contexts/AuthContext";
 import {
   FileText,
   Search,
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 
 const Home = () => {
+  const { user, isStudent, studentProfile } = useAuth();
   const [complaint, setComplaint] = useState("");
   const [category, setCategory] = useState("");
   const [images, setImages] = useState([]);
@@ -406,14 +408,15 @@ const Home = () => {
           reference_number: refNumber,
           name: personalDetails.isAnonymous
             ? "Anonymous"
-            : personalDetails.name || "Anonymous",
-          email: personalDetails.email || null,
+            : (user ? (studentProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || "User") : personalDetails.name) || "Anonymous",
+          email: user?.email || personalDetails.email || null,
           student_id: personalDetails.studentId || null,
           category: category,
           description: complaint,
           is_anonymous: personalDetails.isAnonymous || !personalDetails.name,
           attachment_url: uploadedUrls[0] || null,
           status: "submitted",
+          user_id: user?.id || null, // Track which logged-in user created this
         })
         .select("id")
         .single();
@@ -421,6 +424,26 @@ const Home = () => {
       if (insertError) throw insertError;
 
       await recordSubmission(ipAddress, complaintData?.id);
+
+      // Send confirmation email immediately if user is logged in
+      const userEmail = user?.email || studentProfile?.email;
+      console.log("Attempting to send email to:", userEmail, "User:", user?.id);
+      
+      if (userEmail) {
+        try {
+          const emailResult = await sendTicketConfirmationEmail({
+            to: userEmail,
+            referenceNumber: refNumber,
+            category: category,
+            description: complaint,
+          });
+          console.log("Email send result:", emailResult);
+        } catch (emailErr) {
+          console.error("Error sending confirmation email:", emailErr);
+        }
+      } else {
+        console.log("No email available for logged-in user");
+      }
 
       setReferenceNumber(refNumber);
       setShowPopup(true);
@@ -803,10 +826,13 @@ const Home = () => {
                         <input
                           type="text"
                           name="name"
-                          value={personalDetails.name}
+                          value={user ? (studentProfile?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || "") : personalDetails.name}
                           onChange={handlePersonalDetailsChange}
                           placeholder="Full Name"
-                          className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-maroon-500 focus:ring-1 focus:ring-maroon-500"
+                          disabled={!!user}
+                          className={`w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-maroon-500 focus:ring-1 focus:ring-maroon-500 ${
+                            user ? "bg-gray-100 cursor-not-allowed" : "bg-white"
+                          }`}
                         />
                       </div>
                     )}
@@ -819,11 +845,19 @@ const Home = () => {
                       <input
                         type="email"
                         name="email"
-                        value={personalDetails.email}
+                        value={user ? user.email : personalDetails.email}
                         onChange={handlePersonalDetailsChange}
                         placeholder="Email (for updates)"
-                        className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-maroon-500 focus:ring-1 focus:ring-maroon-500"
+                        disabled={!!user}
+                        className={`w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-maroon-500 focus:ring-1 focus:ring-maroon-500 ${
+                          user ? "bg-gray-100 cursor-not-allowed" : "bg-white"
+                        }`}
                       />
+                      {user && (
+                        <span className="text-xs text-green-600 mt-1 block">
+                          ✓ Logged in as {user.email}
+                        </span>
+                      )}
                     </div>
 
                     <div className="relative">

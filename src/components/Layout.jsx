@@ -4,17 +4,21 @@ import {
   Home,
   Search,
   LogOut,
+  LogIn,
   Shield,
   Building2,
   Menu,
   X,
   Bell,
+  Ticket,
+  GraduationCap,
+  FileText,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 
 const Layout = ({ children }) => {
-  const { user, userRole, userDepartment, signOut } = useAuth();
+  const { user, userRole, userDepartment, isStudent, studentProfile, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -30,12 +34,16 @@ const Layout = ({ children }) => {
 
   const isActive = (path) => location.pathname === path;
 
-  const publicLinks = user
+  const publicLinks = (user && !isStudent)
     ? []
     : [
         { path: "/", label: "Home", icon: Home },
         { path: "/track", label: "Track Status", icon: Search },
       ];
+
+  const studentLinks = [
+    { path: "/my-tickets", label: "My Tickets", icon: Ticket },
+  ];
 
   const superAdminLinks = [
     { path: "/super-admin", label: "Super Admin", icon: Shield },
@@ -244,6 +252,23 @@ const Layout = ({ children }) => {
                   </Link>
                 ))}
 
+              {user &&
+                isStudent &&
+                studentLinks.map(({ path, label, icon: Icon }) => (
+                  <Link
+                    key={path}
+                    to={path}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 ${
+                      isActive(path)
+                        ? "bg-gold-500 text-maroon-800 font-semibold"
+                        : "hover:bg-maroon-700 text-white"
+                    }`}
+                  >
+                    <Icon size={18} />
+                    <span>{label}</span>
+                  </Link>
+                ))}
+
               {user && (
                 <div className="relative" ref={notificationRef}>
                   <button
@@ -298,14 +323,27 @@ const Layout = ({ children }) => {
                 </div>
               )}
 
-              {user && (
+              {user ? (
                 <button
-                  onClick={handleSignOut}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleSignOut();
+                  }}
                   className="flex items-center space-x-2 px-4 py-2 rounded-lg hover:bg-maroon-700 transition-all duration-200"
                 >
                   <LogOut size={18} />
                   <span>Sign Out</span>
                 </button>
+              ) : (
+                <Link
+                  to="/student-login"
+                  className="flex items-center space-x-2 px-4 py-2 bg-gold-500 text-maroon-800 rounded-lg hover:bg-gold-400 transition-all duration-200 font-semibold"
+                >
+                  <LogIn size={18} />
+                  <span>Student Login</span>
+                </Link>
               )}
             </nav>
 
@@ -403,9 +441,30 @@ const Layout = ({ children }) => {
                     </Link>
                   ))}
 
-                {user && (
+                {user &&
+                  isStudent &&
+                  studentLinks.map(({ path, label, icon: Icon }) => (
+                    <Link
+                      key={path}
+                      to={path}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
+                        isActive(path)
+                          ? "bg-gold-500 text-maroon-800 font-semibold"
+                          : "hover:bg-maroon-700 text-white"
+                      }`}
+                    >
+                      <Icon size={20} />
+                      <span>{label}</span>
+                    </Link>
+                  ))}
+
+                {user ? (
                   <button
-                    onClick={() => {
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
                       setMobileMenuOpen(false);
                       handleSignOut();
                     }}
@@ -414,6 +473,15 @@ const Layout = ({ children }) => {
                     <LogOut size={20} />
                     <span>Sign Out</span>
                   </button>
+                ) : (
+                  <Link
+                    to="/student-login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center space-x-3 px-4 py-3 bg-gold-500 text-maroon-800 rounded-lg font-semibold"
+                  >
+                    <LogIn size={20} />
+                    <span>Student Login</span>
+                  </Link>
                 )}
               </nav>
             </div>

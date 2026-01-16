@@ -2,7 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user, userRole, loading } = useAuth();
+  const { user, userRole, isStudent, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -13,6 +13,18 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     );
   }
 
+  // For student routes
+  if (allowedRoles?.includes("student")) {
+    if (!user) {
+      return <Navigate to="/student-login" state={{ from: location }} replace />;
+    }
+    if (!isStudent) {
+      return <Navigate to="/" replace />;
+    }
+    return children;
+  }
+
+  // For admin/department routes
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
