@@ -1,6 +1,9 @@
 -- =====================================================
 -- STUDENT AUTHENTICATION SETUP
--- Liceo de Cagayan University - Complaint System
+-- Liceo de Cagayan University - Feedback System
+-- 
+-- NOTE: In the UI, "complaints" are now referred to as "feedback", 
+-- but the underlying database tables and columns retain the "complaint" naming convention.
 -- Run this SQL in your Supabase SQL Editor
 -- =====================================================
 

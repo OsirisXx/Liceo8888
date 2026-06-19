@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext({})
@@ -12,6 +12,7 @@ export const AuthProvider = ({ children }) => {
   const [isStudent, setIsStudent] = useState(false)
   const [studentProfile, setStudentProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const currentUserId = useRef(null)
 
   useEffect(() => {
     let isMounted = true
@@ -32,6 +33,7 @@ export const AuthProvider = ({ children }) => {
       try {
         const { data: { session } } = await withTimeout(supabase.auth.getSession())
         if (isMounted && session?.user) {
+          currentUserId.current = session.user.id
           setUser(session.user)
           await withTimeout(handleUserSession(session.user))
         }
@@ -51,7 +53,6 @@ export const AuthProvider = ({ children }) => {
       if (!isMounted) return
       
       // Skip INITIAL_SESSION event - we already handle this in initAuth
-      // Only process SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED, etc.
       if (event === 'INITIAL_SESSION') {
         return
       }
@@ -63,12 +64,21 @@ export const AuthProvider = ({ children }) => {
       
       try {
         if (session?.user) {
-          setUser(session.user)
-          // Only re-fetch profile on actual sign in, not token refresh
-          if (event === 'SIGNED_IN') {
-            await withTimeout(handleUserSession(session.user))
+          // Only trigger loading and re-fetch if the user actually changed
+          if (currentUserId.current !== session.user.id) {
+            currentUserId.current = session.user.id
+            if (isMounted) setLoading(true)
+            setUser(session.user)
+            // Only re-fetch profile on actual sign in, not token refresh
+            if (event === 'SIGNED_IN') {
+              await withTimeout(handleUserSession(session.user))
+            }
+          } else {
+            // User didn't change, just update the session object silently
+            setUser(session.user)
           }
         } else {
+          currentUserId.current = null
           setUser(null)
           setUserRole(null)
           setUserDepartment(null)
@@ -89,7 +99,15 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const handleUserSession = async (authUser) => {
-    // Check if user is a student (Google OAuth with @liceo.edu.ph)
+    // First, check if they exist in the staff/admin users table
+    // We must do this even for @liceo.edu.ph emails because staff use them too
+    const isStaff = await checkAndHandleStaffRole(authUser.id)
+    
+    if (isStaff) {
+      return; // The checkAndHandleStaffRole function will sign them out and redirect
+    }
+
+    // If they aren't staff, check if they are a valid student (Google OAuth with @liceo.edu.ph)
     const email = authUser.email || ''
     if (email.endsWith('@liceo.edu.ph') && authUser.app_metadata?.provider === 'google') {
       setIsStudent(true)
@@ -97,8 +115,9 @@ export const AuthProvider = ({ children }) => {
       // Fetch or create student profile
       await fetchOrCreateStudentProfile(authUser)
     } else {
-      // Check for admin/department role
-      await fetchUserRole(authUser.id)
+      // Not a student and not staff
+      setIsStudent(false)
+      setUserRole(null)
     }
   }
 
@@ -147,20 +166,58 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  const checkAndHandleStaffRole = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('role, department')
+        .eq('id', userId)
+        .maybeSingle()
+
+      if (error) {
+        console.error('Error fetching user role:', error)
+        return false
+      }
+
+      if (data && data.role && data.role !== 'student') {
+        // This is a staff/admin account — they must not use the student portal
+        const formatRole = (role) =>
+          role.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+
+        // Store message in sessionStorage so it survives the sign-out redirect
+        sessionStorage.setItem(
+          'wrongRoleError',
+          `Your account is a ${formatRole(data.role)}. You should login through the correct channels.`
+        )
+
+        // Sign them out and redirect to student login page
+        await supabase.auth.signOut({ scope: 'global' })
+        window.location.replace('/student-login')
+        return true // Yes, they are staff
+      }
+      
+      return false // Not staff
+    } catch (err) {
+      console.error('fetchUserRole error:', err)
+      return false
+    }
+  }
+
+  // Legacy fetchUserRole (keep it for any other uses, just to be safe, but modified to not redirect)
   const fetchUserRole = async (userId) => {
     try {
       const { data, error } = await supabase
         .from('users')
         .select('role, department')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
       if (error) {
         console.error('Error fetching user role:', error)
         return
       }
 
-      if (data) {
+      if (data && data.role) {
         setUserRole(data.role)
         setUserDepartment(data.department)
         setIsStudent(false)

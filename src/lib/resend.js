@@ -1,8 +1,8 @@
-// Resend Email Service for Liceo 8888 Ticketing System
+// Resend Email Service for Liceo Cares Ticketing System
 // Uses Resend API to send email notifications
 
 const RESEND_API_KEY = import.meta.env.VITE_RESEND_API_KEY;
-const FROM_EMAIL = "Liceo 8888 <noreply@citattendance.info>";
+const FROM_EMAIL = "Liceo Cares <noreply@citattendance.info>";
 
 // Liceo de Cagayan University Colors
 const COLORS = {
@@ -32,10 +32,10 @@ const generateEmailTemplate = ({ title, greeting, content, footer }) => `
           <tr>
             <td style="background: linear-gradient(135deg, ${COLORS.maroon} 0%, ${COLORS.lightMaroon} 100%); padding: 30px 40px; text-align: center;">
               <h1 style="margin: 0; color: ${COLORS.gold}; font-size: 28px; font-weight: bold;">
-                🎓 Liceo 8888
+                🎓 Liceo Cares
               </h1>
               <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">
-                Liceo de Cagayan University Complaint Management System
+                Liceo de Cagayan University Feedback Management System
               </p>
             </td>
           </tr>
@@ -64,7 +64,7 @@ const generateEmailTemplate = ({ title, greeting, content, footer }) => `
             <td style="background-color: #f8f8f8; padding: 25px 40px; border-top: 1px solid #eee;">
               ${footer || `
                 <p style="margin: 0; color: #666; font-size: 13px; text-align: center;">
-                  This is an automated message from Liceo 8888 Complaint Management System.<br>
+                  This is an automated message from Liceo Cares Feedback Management System.<br>
                   Please do not reply to this email.
                 </p>
                 <p style="margin: 15px 0 0 0; color: #999; font-size: 12px; text-align: center;">
@@ -163,12 +163,12 @@ export const sendTicketConfirmationEmail = async ({
       : description;
 
   const html = generateEmailTemplate({
-    title: "Complaint Submitted Successfully",
-    greeting: "Thank you for submitting your complaint to Liceo 8888.",
+    title: "Feedback Submitted Successfully",
+    greeting: "Thank you for submitting your feedback to Liceo Cares.",
     content: `
       <p style="margin: 0 0 15px 0; color: #555; font-size: 15px; line-height: 1.6;">
-        We have received your complaint and it is now pending review by the VP Admin. 
-        You will receive email updates as your complaint progresses through our system.
+        We have received your feedback and it is now pending review by the VP Admin. 
+        You will receive email updates as your feedback progresses through our system.
       </p>
       
       ${ticketReferenceBox(referenceNumber)}
@@ -187,21 +187,21 @@ export const sendTicketConfirmationEmail = async ({
         <strong>What happens next?</strong>
       </p>
       <ol style="margin: 10px 0; padding-left: 20px; color: #666; font-size: 14px; line-height: 1.8;">
-        <li>Your complaint will be reviewed by the VP Admin</li>
+        <li>Your feedback will be reviewed by the VP Admin</li>
         <li>If verified, it will be assigned to the appropriate department</li>
         <li>The department will work on resolving your concern</li>
         <li>You'll receive updates at each step of the process</li>
       </ol>
       
       <p style="margin: 20px 0 0 0; color: #888; font-size: 13px; text-align: center;">
-        Save your tracking number to check the status of your complaint anytime.
+        Save your tracking number to check the status of your feedback anytime.
       </p>
     `,
   });
 
   return sendEmail({
     to,
-    subject: `[Liceo 8888] Complaint Received - ${referenceNumber}`,
+    subject: `[Liceo Cares] Feedback Received - ${referenceNumber}`,
     html,
   });
 };

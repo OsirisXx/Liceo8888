@@ -124,7 +124,7 @@ const AdminDashboard = () => {
 
       await supabase.from("audit_trail").insert({
         complaint_id: selectedComplaint.id,
-        action: "Complaint Verified",
+        action: "Feedback Verified",
         performed_by: user.id,
         details: `Assigned to ${
           departments.find((d) => d.value === selectedDepartment)?.label
@@ -137,8 +137,8 @@ const AdminDashboard = () => {
       setRemarks("");
       fetchComplaints();
     } catch (err) {
-      console.error("Error approving complaint:", err);
-      alert("Failed to approve complaint");
+      console.error("Error approving feedback:", err);
+      alert("Failed to approve feedback");
     } finally {
       setActionLoading(false);
     }
@@ -166,7 +166,7 @@ const AdminDashboard = () => {
 
       await supabase.from("audit_trail").insert({
         complaint_id: selectedComplaint.id,
-        action: "Complaint Rejected",
+        action: "Feedback Rejected",
         performed_by: user.id,
         details: `Reason: ${remarks}`,
       });
@@ -176,8 +176,8 @@ const AdminDashboard = () => {
       setRemarks("");
       fetchComplaints();
     } catch (err) {
-      console.error("Error rejecting complaint:", err);
-      alert("Failed to reject complaint");
+      console.error("Error rejecting feedback:", err);
+      alert("Failed to reject feedback");
     } finally {
       setActionLoading(false);
     }
@@ -373,7 +373,7 @@ const AdminDashboard = () => {
                 <RefreshCw size={18} className="text-gray-600" />
               </button>
               <span className="text-sm text-gray-500 ml-auto">
-                {filteredComplaints.length} complaint
+                {filteredComplaints.length} feedback
                 {filteredComplaints.length !== 1 ? "s" : ""}
               </span>
             </div>
@@ -504,7 +504,7 @@ const AdminDashboard = () => {
               <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">
-                    Complaint Details
+                    Feedback Details
                   </h2>
                   <p className="text-sm text-gray-500 font-mono">
                     {selectedComplaint.reference_number}
@@ -577,16 +577,16 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                {/* Complaint Evidence Image */}
+                {/* Feedback Evidence Image */}
                 {selectedComplaint.attachment_url && (
                   <div>
                     <p className="text-sm text-gray-500 mb-2">
-                      Complaint Evidence
+                      Feedback Evidence
                     </p>
                     <div className="bg-gray-50 rounded-xl p-4">
                       <img
                         src={selectedComplaint.attachment_url}
-                        alt="Complaint Evidence"
+                        alt="Feedback Evidence"
                         className="max-h-64 rounded-lg border border-gray-200 mb-2"
                       />
                       <a

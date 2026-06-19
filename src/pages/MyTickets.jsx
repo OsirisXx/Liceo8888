@@ -353,7 +353,7 @@ const MyTickets = () => {
                 className="inline-flex items-center space-x-2 px-6 py-3 bg-maroon-800 text-white rounded-lg hover:bg-maroon-700 transition-colors"
               >
                 <FileText size={18} />
-                <span>Submit a Complaint</span>
+                <span>Submit a Feedback</span>
               </button>
             )}
           </div>

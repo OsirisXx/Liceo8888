@@ -2,17 +2,37 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { GraduationCap, AlertCircle, Mail } from "lucide-react";
+import { supabase } from "../lib/supabase";
 
 const StudentLogin = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [allowGuestLogin, setAllowGuestLogin] = useState(false);
   const { signInWithGoogle, user, isStudent, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Check for role error passed from AuthContext via sessionStorage
+    const wrongRoleError = sessionStorage.getItem("wrongRoleError");
+    if (wrongRoleError) {
+      setError(wrongRoleError);
+      sessionStorage.removeItem("wrongRoleError");
+    }
     if (!authLoading && user && isStudent) {
       navigate("/my-tickets", { replace: true });
     }
+    // Fetch system settings for guest login visibility
+    supabase
+      .from("system_settings")
+      .select("allow_guest_login")
+      .single()
+      .then(({ data, error }) => {
+        if (!error && data) {
+          setAllowGuestLogin(data.allow_guest_login ?? false);
+        } else {
+          setAllowGuestLogin(false);
+        }
+      });
   }, [user, isStudent, authLoading, navigate]);
 
   const handleGoogleSignIn = async () => {
@@ -112,20 +132,22 @@ const StudentLogin = () => {
             )}
           </button>
 
-          {/* Divider */}
-          <div className="my-6 flex items-center">
-            <div className="flex-1 border-t border-gray-200"></div>
-            <span className="px-4 text-sm text-gray-500">or</span>
-            <div className="flex-1 border-t border-gray-200"></div>
-          </div>
-
-          {/* Continue Without Login */}
-          <button
-            onClick={() => navigate("/")}
-            className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-medium hover:bg-gray-200 transition-all duration-200"
-          >
-            Continue as Guest
-          </button>
+          {/* Divider + Guest Login (only if enabled) */}
+          {allowGuestLogin && (
+            <>
+              <div className="my-6 flex items-center">
+                <div className="flex-1 border-t border-gray-200"></div>
+                <span className="px-4 text-sm text-gray-500">or</span>
+                <div className="flex-1 border-t border-gray-200"></div>
+              </div>
+              <button
+                onClick={() => navigate("/")}
+                className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-medium hover:bg-gray-200 transition-all duration-200"
+              >
+                Continue as Guest
+              </button>
+            </>
+          )}
 
           {/* Footer */}
           <div className="mt-6 text-center space-y-2">
