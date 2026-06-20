@@ -984,11 +984,12 @@ const Home = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Why Use <span className="text-maroon-800">Liceo Cares</span>?
+              Why <span className="text-maroon-800">Liceo Cares</span>?
             </h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Our feedback management system is designed to provide a
-              transparent and efficient way to address your concerns.
+              Your voice matters. We've designed a transparent and efficient
+              platform to ensure your suggestions are heard and your concerns
+              are addressed promptly.
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8">
